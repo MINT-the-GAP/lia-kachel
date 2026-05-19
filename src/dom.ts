@@ -1,17 +1,7 @@
-import { dlog } from "./debug";
+// dom.ts — DOM query helpers, LiaScript payload dispatch, and accent-colour theming.
+// Pure utility functions with no side effects — safe to call multiple times.
 
-declare global {
-  interface Window {
-    __liaResetGetTileQuizTargetsFromRoot?: (root: Element) => Element[];
-    __liaResetCollectTileQuizRoots?: (scope: Element) => Element[];
-    __liaResetGetTileQuizRootFromNode?: (node: Element, scope: Element) => Element | null;
-    __liaResetRefreshTileTargetStyles?: (doc: Document) => void;
-    LIA?: { send: (payload: unknown) => void };
-    __liaTileCrossInternalDispatch?: number;
-    __liaKachelfolgeExpected: Record<string, string[]>;
-    __liaKfAssignedSources: WeakMap<Element, { sourceEl: Element; text: string; sourceId: number | null; ts: number; reason: string }>;
-  }
-}
+import { dlog } from "./debug";
 
 export function norm(s: unknown): string {
   return String(s || "").replace(/\s+/g, " ").trim();

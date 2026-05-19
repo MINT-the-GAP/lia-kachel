@@ -1,3 +1,6 @@
+// touch.ts — Touch drag-and-drop handler.
+// Tracks touch gestures, renders a ghost element, and commits drops via tile.ts.
+
 import { dlog } from "./debug";
 import { norm, sourceFromNode, tileRootFrom, findTargetFromNode, findTargetFromPoint, isManagedKachelTouchRoot, applyThemeColorToTargetPlaceholders } from "./dom";
 import { applyTileStateDirectly, emulateLocalDrop } from "./tile";
@@ -198,8 +201,3 @@ export function installTouchHandlers(deps: TouchHandlerDeps): void {
   }, { capture: true, passive: false });
 }
 
-declare global {
-  interface Window {
-    __liaResetRefreshTileTargetStyles?: (doc: Document) => void;
-  }
-}

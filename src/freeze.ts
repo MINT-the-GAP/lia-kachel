@@ -1,26 +1,14 @@
+// freeze.ts — Quiz freeze logic: persists solved/resolved state across slide navigation.
+// Stores freeze tokens and feedback text in memory; restores them on re-render.
+
 import { dlog } from "./debug";
 import {
   norm, normKey, targetNodes, sourceCandidates, isSolvedOrResolvedQuizNode,
   isReliableFreezeKey, isReliableFreezeUid, quizNodeFrom, tileRootFrom, quizKeyFrom,
-  extractTargetId, extractSourceId, isInsideAnyTarget, getCurrentSlideHashToken,
-  expectedTextsByTargetIds, sameMultiset, targetDisplayText,
+  getCurrentSlideHashToken, expectedTextsByTargetIds, sameMultiset, targetDisplayText,
 } from "./dom";
-import { applyThemeColorToTargetPlaceholders } from "./dom";
 
 // ── Freeze state stores ──────────────────────────────────────────────────────
-
-declare global {
-  interface Window {
-    __liaKfFrozenQuizKeys: Set<string>;
-    __liaKfFrozenQuizUids: Set<string>;
-    __liaKfFrozenQuizFeedback: Map<string, { text: string; className: string; hidden: number }>;
-    __liaResetGetTileQuizRootFromNode?: (node: Element, scope: Element) => Element | null;
-    __liaResetCollectTileQuizRoots?: (scope: Element) => Element[];
-    __liaResetGetTileQuizTargetsFromRoot?: (root: Element) => Element[];
-    __liaResetRefreshTileTargetStyles?: (doc: Document) => void;
-    __liaKachelfolgeExpected: Record<string, string[]>;
-  }
-}
 
 export function initFreezeStores(): void {
   window.__liaKfFrozenQuizKeys = window.__liaKfFrozenQuizKeys || new Set();

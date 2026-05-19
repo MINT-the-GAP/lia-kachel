@@ -1,3 +1,6 @@
+// tile.ts — Tile state management: direct DOM apply, cross-root drop emulation,
+// source resolution, and standalone Kachel area setup.
+
 import { dlog } from "./debug";
 import {
   norm, normKey, pickAccentFrom,

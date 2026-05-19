@@ -1,13 +1,5 @@
-declare global {
-  interface Window {
-    __liaTileCrossDebug: string[];
-    __liaTileCrossDebugEnabled: boolean;
-    __liaTileCrossLogScope: string;
-    __liaResetDebugWrite?: (line: string) => void;
-    __liaKachelfolgeLog: (msg: string) => void;
-    __liaTileCrossDumpDebug: () => string;
-  }
-}
+// debug.ts — In-memory debug log and console bridge.
+// Exposes window.__liaTileCrossDumpDebug() to read the log at runtime.
 
 export function initDebug(): void {
   if ((window as any).__liaTileCrossPatched) return;

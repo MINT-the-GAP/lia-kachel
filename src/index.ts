@@ -9,14 +9,6 @@ import { setupStandaloneKachelAreas, bootstrapTileStateObservers } from "./tile"
 import { initFreezeStores, freezeResolvedQuizzesInDocument } from "./freeze";
 import { installAllEventListeners } from "./events";
 
-declare global {
-  interface Window {
-    __liaTileCrossPatched?: number;
-    __liaKachelfolgeExpected: Record<string, string[]>;
-    __liaKfAssignedSources: WeakMap<Element, { sourceEl: Element; text: string; sourceId: number | null; ts: number; reason: string }>;
-  }
-}
-
 function boot(): void {
   if (window.__liaTileCrossPatched) return;
   window.__liaTileCrossPatched = 1;
@@ -29,25 +21,18 @@ function boot(): void {
 
   ensureRoundedTileStyles();
 
-  // Apply accent color to existing target placeholders after a short delay
-  // to let the LiaScript theme load first.
-  window.setTimeout(() => applyThemeColorToTargetPlaceholders(document), 60);
-  window.setTimeout(() => applyThemeColorToTargetPlaceholders(document), 500);
-  window.setTimeout(() => applyThemeColorToTargetPlaceholders(document), 1100);
-
-  // Discover standalone <div class="Kachel"> areas and register expected answers.
-  window.setTimeout(() => setupStandaloneKachelAreas(document), 120);
-  window.setTimeout(() => setupStandaloneKachelAreas(document), 520);
-  window.setTimeout(() => setupStandaloneKachelAreas(document), 1100);
-
-  // Bootstrap tile state observers (for debug logging).
-  window.setTimeout(() => bootstrapTileStateObservers(), 160);
-  window.setTimeout(() => bootstrapTileStateObservers(), 760);
-  window.setTimeout(() => bootstrapTileStateObservers(), 1500);
-
-  // Freeze any already-solved quizzes that survived a page reload.
-  window.setTimeout(() => freezeResolvedQuizzesInDocument("init-freeze-120"), 120);
-  window.setTimeout(() => freezeResolvedQuizzesInDocument("init-freeze-620"), 620);
+  // LiaScript renders slides progressively after DOMContentLoaded, so setup
+  // functions run at three increasing delays to catch late-appearing elements.
+  // All functions are idempotent — repeated calls are safe.
+  const RETRY_DELAYS = [60, 520, 1100] as const;
+  for (const delay of RETRY_DELAYS) {
+    window.setTimeout(() => {
+      applyThemeColorToTargetPlaceholders(document);
+      setupStandaloneKachelAreas(document);
+      bootstrapTileStateObservers();
+      freezeResolvedQuizzesInDocument("init-freeze-" + delay);
+    }, delay);
+  }
 
   installAllEventListeners();
 

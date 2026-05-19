@@ -1,12 +1,15 @@
+// events.ts — Global event listeners: drag lifecycle, drop handling, dblclick clear,
+// frozen-quiz interaction blocking, and style-repair on navigation.
+
 import { dlog } from "./debug";
 import {
   norm, sourceFromNode, tileRootFrom, quizNodeFrom, quizKeyFrom,
-  findTargetFromNode, findTargetFromPoint, targetDisplayText, targetNodes,
-  applyThemeColorToTargetPlaceholders,
+  findTargetFromNode, findTargetFromPoint, targetDisplayText,
+  applyThemeColorToTargetPlaceholders, isSolvedOrResolvedQuizNode,
 } from "./dom";
-import { applyTileStateDirectly, emulateLocalDrop, bootstrapTileStateObservers, setupStandaloneKachelAreas } from "./tile";
+import { applyTileStateDirectly, emulateLocalDrop, setupStandaloneKachelAreas, rememberAssignedSource } from "./tile";
 import {
-  freezeResolvedQuizzesInDocument, rememberFrozenQuiz, rememberQuizFeedback,
+  freezeResolvedQuizzesInDocument, rememberFrozenQuiz,
   isQuizSuccessState, handleCheckButtonClick,
 } from "./freeze";
 import { installTouchHandlers } from "./touch";
@@ -52,13 +55,6 @@ export function installAllEventListeners(): void {
     try { (ev as any).stopImmediatePropagation?.(); } catch (e) {}
     dlog("kf: blocked frozen interaction kind='" + label + "'");
     return true;
-  }
-
-  function isSolvedOrResolvedQuizNode(node: Element): boolean {
-    if (!node) return false;
-    if (node.classList?.contains("solved") || node.classList?.contains("resolved")) return true;
-    const cls = String(node.className || "").toLowerCase();
-    return cls.includes(" solved") || cls.includes(" resolved") || cls === "solved" || cls === "resolved";
   }
 
   // ── Style repair scheduler ────────────────────────────────────────────────
@@ -311,21 +307,3 @@ export function installAllEventListeners(): void {
   });
 }
 
-function rememberAssignedSource(target: Element, sourceEl: Element, text: string, reason: string): void {
-  if (!target || !sourceEl || !window.__liaKfAssignedSources) return;
-  try {
-    window.__liaKfAssignedSources.set(target, {
-      sourceEl, text: norm(text || sourceEl.textContent),
-      sourceId: null, ts: Date.now(), reason: String(reason || "unknown"),
-    });
-  } catch (e) {}
-}
-
-declare global {
-  interface Window {
-    __liaKfBlockDblclickClear?: boolean;
-    __liaResetRefreshTileTargetStyles?: (doc: Document) => void;
-    __liaKfAssignedSources: WeakMap<Element, { sourceEl: Element; text: string; sourceId: number | null; ts: number; reason: string }>;
-    __liaKfNavObserverInstalled?: number;
-  }
-}
