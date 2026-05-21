@@ -112,6 +112,12 @@ LiaScript-Plugin für verbesserte **Kachel-Quizarten** (Drag-and-Drop Tile Quizz
 - **Sequenzielle Anzeige** (nur nächstes Feld sichtbar) mit `@KachelfolgeN`
 - **Quiz-Einfrieren** nach korrekter Lösung oder Auflösen
 
+__Try it on LiaScript:__
+https://liascript.github.io/course/?https://raw.githubusercontent.com/MINT-the-GAP/lia-Kachel/main/README.md
+
+__See the project on GitHub:__
+https://github.com/MINT-the-GAP/lia-Kachel
+
 ---
 
 ## Einbindung
