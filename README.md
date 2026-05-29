@@ -1,5 +1,5 @@
 <!--
-author:   Martin Lommatzsch
+author:   Martin Lommatzsch, Jihad Hyadi
 version:  0.0.1
 language: de
 comment:  lia-Kachel plugin — Kachelfolge drag-and-drop tile quizzes with touch support

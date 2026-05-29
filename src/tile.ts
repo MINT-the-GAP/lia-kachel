@@ -16,6 +16,7 @@ import {
 
 const __kfStateObservedRoots = new WeakSet<Element>();
 const __kfStateSignatures = new WeakMap<Element, string>();
+let __kfInlineExpectedBlocksPromise: Promise<string[][] | null> | null = null;
 
 function tileStateSignature(targets: string[], sources: string[]): string {
   return targets.join("|") + " || " + sources.join("|");
@@ -532,12 +533,97 @@ export function emulateLocalDrop(
 
 // ── Standalone Kachel area setup ─────────────────────────────────────────────
 
+function currentCourseSourceUrl(): string {
+  const href = String(window.location.href || "");
+  const queryAt = href.indexOf("?");
+  if (queryAt < 0) return "";
+  let sourceUrl = href.slice(queryAt + 1);
+  const hashAt = sourceUrl.indexOf("#");
+  if (hashAt >= 0) sourceUrl = sourceUrl.slice(0, hashAt);
+  try { sourceUrl = decodeURIComponent(sourceUrl); } catch (e) {}
+  return /^https?:\/\//i.test(sourceUrl) ? sourceUrl : "";
+}
+
+function parseExpectedTextsFromRawTileMarkup(raw: string): string[] {
+  const expected: string[] = [];
+  String(raw || "").replace(/\[->\[([^\]]*)\]\]/g, function (_, inner) {
+    const match = String(inner || "").match(/\(([^)]*)\)/);
+    if (match) expected.push(String(match[1] || "").trim());
+    return _;
+  });
+  return expected.filter(v => !!norm(v));
+}
+
+function parseInlineExpectedBlocksFromSource(markdown: string): string[][] {
+  const cleaned = String(markdown || "")
+    .replace(/```[\s\S]*?```/g, "\n")
+    .replace(/~~~[\s\S]*?~~~/g, "\n");
+  const blocks: string[][] = [];
+  const pattern = /<div\s+class=["']Kachel["'][^>]*>([\s\S]*?)<\/div>/gi;
+  let match: RegExpExecArray | null = null;
+  while ((match = pattern.exec(cleaned))) {
+    blocks.push(parseExpectedTextsFromRawTileMarkup(match[1] || ""));
+  }
+  return blocks;
+}
+
+function getInlineExpectedBlocksFromSource(): Promise<string[][] | null> {
+  if (__kfInlineExpectedBlocksPromise) return __kfInlineExpectedBlocksPromise;
+
+  const sourceUrl = currentCourseSourceUrl();
+  if (!sourceUrl || typeof window.fetch !== "function") {
+    __kfInlineExpectedBlocksPromise = Promise.resolve(null);
+    return __kfInlineExpectedBlocksPromise;
+  }
+
+  __kfInlineExpectedBlocksPromise = window.fetch(sourceUrl, { credentials: "omit" })
+    .then(response => response.ok ? response.text() : "")
+    .then(text => {
+      if (!text) return null;
+      const blocks = parseInlineExpectedBlocksFromSource(text);
+      dlog("kf: inline source blocks=" + String(blocks.length));
+      return blocks.length ? blocks : null;
+    })
+    .catch(error => {
+      dlog("kf: inline source fetch failed: " + String(error).slice(0, 120));
+      return null;
+    });
+
+  return __kfInlineExpectedBlocksPromise;
+}
+
+function hydrateInlineExpectedFromSource(blocks: Element[]): void {
+  if (!blocks.length) return;
+
+  getInlineExpectedBlocksFromSource().then(expectedBlocks => {
+    if (!expectedBlocks?.length) return;
+
+    blocks.forEach((block, idx) => {
+      const expected = expectedBlocks[idx] || [];
+      const normalized = expected.map(v => String(v || "").trim()).filter(Boolean);
+      if (!normalized.length) return;
+
+      const uid = String(block.getAttribute?.("data-kf-uid") || "").trim() || ("inline-" + String(idx + 1));
+      const current = Array.isArray(window.__liaKachelfolgeExpected[uid]) ? window.__liaKachelfolgeExpected[uid] : [];
+      const unchanged =
+        current.length === normalized.length &&
+        current.every((value, valueIdx) => normKey(value) === normKey(normalized[valueIdx]));
+
+      window.__liaKachelfolgeExpected[uid] = normalized;
+      if (!unchanged) {
+        dlog("kf: inline area setup uid='" + uid + "' expected='" + normalized.join("|") + "' from=source");
+      }
+    });
+  }).catch(() => {});
+}
+
 export function setupStandaloneKachelAreas(root: Document | Element): void {
   const scope = (root && (root as Element).querySelectorAll) ? root as Element : document as unknown as Element;
   const blocks = Array.from(scope.querySelectorAll?.("div.Kachel") || []) as Element[];
   if (!blocks.length) return;
 
   window.__liaKachelfolgeExpected = window.__liaKachelfolgeExpected || {};
+  hydrateInlineExpectedFromSource(blocks);
 
   const stopWords: Record<string, 1> = {
     "in": 1, "den": 1, "dem": 1, "der": 1, "die": 1, "das": 1,
@@ -611,6 +697,7 @@ export function setupStandaloneKachelAreas(root: Document | Element): void {
         dlog("kf: inline area setup uid='" + uid + "' expected='" + window.__liaKachelfolgeExpected[uid].join("|") + "' from=ids");
       }
     }
+        hydrateInlineExpectedFromSource(blocks);
 
     try { applyThemeColorToTargetPlaceholders(block); } catch (e) {}
     ensureTileStateObserver(block, "standalone-setup");
