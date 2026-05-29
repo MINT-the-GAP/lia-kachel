@@ -87,14 +87,19 @@ window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
     window.setTimeout(updateSequentialVisibility, 700);
   }
 
-  window.setTimeout(function () {
+  function initWrap() {
     var wrap = document.getElementById("kachelfolge-wrap-" + uid);
-    if (!wrap) return;
+    if (!wrap) return false;
     wrap.setAttribute("data-kf-uid", uid);
     var candidates = wrap.querySelectorAll ? Array.prototype.slice.call(wrap.querySelectorAll("[onclick],[ondragover],[ondragstart],[class*='lia-quiz']")) : [];
     candidates.forEach(function(el) { try { el.setAttribute("data-kf-uid", uid); } catch(e) {} });
     if (mode === "seq") setupSequentialTargets(wrap, expected.length);
-  }, 500);
+    return true;
+  }
+
+  [0, 30, 120, 260, 700].forEach(function(delay) {
+    window.setTimeout(initWrap, delay);
+  });
 })();
 </script>
 @end
