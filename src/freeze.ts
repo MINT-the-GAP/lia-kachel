@@ -26,15 +26,25 @@ function collectQuizFreezeTokens(quiz: Element | null, tileRoot: Element | null)
   const addUid = (u: string) => {
     if (isReliableFreezeUid(u) && !out.uids.includes(u)) out.uids.push(u);
   };
+  const addUidOrScopedInlineKey = (u: string) => {
+    const uid = String(u || "").trim();
+    if (!uid) return;
+    // inline-* ids repeat across slides; scope them by slide hash as keys.
+    if (/^inline-\d+$/i.test(uid)) {
+      addKey("sig:" + getCurrentSlideHashToken() + ":inline:" + uid);
+      return;
+    }
+    addUid(uid);
+  };
   if (quiz) addKey(quizKeyFrom(quiz));
   if (tileRoot) addKey(quizKeyFrom(tileRoot));
   addKey(buildStableQuizSignatureKey(quiz, tileRoot));
   for (const n of [quiz, tileRoot]) {
     if (!n) continue;
     const uid = String(n.getAttribute?.("data-kf-uid") || "").trim();
-    addUid(uid);
+    addUidOrScopedInlineKey(uid);
     const uq = n.closest?.("[data-kf-uid]");
-    addUid(String(uq?.getAttribute?.("data-kf-uid") || "").trim());
+    addUidOrScopedInlineKey(String(uq?.getAttribute?.("data-kf-uid") || "").trim());
   }
   return out;
 }
@@ -47,6 +57,25 @@ function feedbackMemoryTokens(quiz: Element | null, tileRoot: Element | null): s
 function buildStableQuizSignatureKey(quiz: Element | null, tileRoot: Element | null): string {
   const root = tileRoot || (quiz ? tileRootFrom(quiz) : null) || quiz?.closest?.(".Kachel, .kachelfolge-wrap, [id^='kachelfolge-wrap-']") || null;
   if (!root) return "";
+
+  function domPathToken(node: Element): string {
+    const parts: string[] = [];
+    let cur: Element | null = node;
+    let guard = 0;
+    while (cur && cur !== document.body && guard < 16) {
+      const tag = String(cur.tagName || "").toLowerCase() || "x";
+      let idx = 1;
+      let sib = cur.previousElementSibling;
+      while (sib) {
+        if (String(sib.tagName || "").toLowerCase() === tag) idx += 1;
+        sib = sib.previousElementSibling;
+      }
+      parts.push(tag + ":" + String(idx));
+      cur = cur.parentElement;
+      guard += 1;
+    }
+    return parts.reverse().join(">");
+  }
 
   let localIndex = -1;
   try {
@@ -62,6 +91,14 @@ function buildStableQuizSignatureKey(quiz: Element | null, tileRoot: Element | n
     localIndex = roots.indexOf(root);
   } catch (e) {}
 
+  if (localIndex < 0) {
+    try {
+      const fallbackRoots = Array.from(document.querySelectorAll?.(".Kachel, .kachelfolge-wrap, [id^='kachelfolge-wrap-'], .lia-quiz, lia-quiz") || [])
+        .filter(el => el === root || targetNodes(el).length > 0);
+      localIndex = fallbackRoots.indexOf(root);
+    } catch (e) {}
+  }
+
   const expectedMap = window.__liaKachelfolgeExpected || {};
   const uid = String(root.getAttribute?.("data-kf-uid") || "").trim();
   let expected: string[] = [];
@@ -72,7 +109,8 @@ function buildStableQuizSignatureKey(quiz: Element | null, tileRoot: Element | n
     if (info.complete && Array.isArray(info.expected)) expected = info.expected.slice();
   }
   const expectedSig = expected.map(normKey).filter(Boolean).sort().join("|") || "none";
-  return "sig:" + getCurrentSlideHashToken() + ":" + String(localIndex) + ":" + expectedSig;
+  const pathSig = domPathToken(root) || "nopth";
+  return "sig:" + getCurrentSlideHashToken() + ":" + String(localIndex) + ":" + pathSig + ":" + expectedSig;
 }
 
 // ── Feedback memory ──────────────────────────────────────────────────────────
@@ -209,6 +247,15 @@ export function freezeResolvedQuizzesInDocument(reason: string): void {
 
 export function handleCheckButtonClick(ev: MouseEvent, btn: Element): void {
   const tileRoot = tileRootFrom(btn);
+  const modeNode = btn.closest?.("[data-kf-mode]") || null;
+  let mode = String(modeNode?.getAttribute?.("data-kf-mode") || "").trim().toLowerCase();
+  if ((!mode || (mode !== "classic" && mode !== "seq")) && tileRoot) {
+    // Fallback for layouts where the mode attribute is attached to a nearby wrapper.
+    const localModeNode = tileRoot.closest?.("[data-kf-mode]") || tileRoot.querySelector?.("[data-kf-mode]") || null;
+    mode = String(localModeNode?.getAttribute?.("data-kf-mode") || "").trim().toLowerCase();
+  }
+  const isMacroMode = mode === "classic" || mode === "seq";
+
   const targets = tileRoot ? targetNodes(tileRoot) : [];
   const actualSync = targets.map(t => targetDisplayText(t));
 
@@ -220,52 +267,86 @@ export function handleCheckButtonClick(ev: MouseEvent, btn: Element): void {
 
   dlog("kf: native-check complete=" + (nativeExpectedInfo.complete ? 1 : 0) + " actual='" + actualSync.join("|") + "' expected='" + nativeExpectedInfo.expected.join("|") + "' ok=" + (isNativeIdTextCorrect ? 1 : 0));
 
+  if (!targets.length) return;
+  if (!actualSync.every(v => !!norm(v))) return;
+
+  let isCorrect = false;
+  let groupUid = "native-id";
+  let expectedForLog: string[] = nativeExpectedInfo.expected.map(v => norm(v)).filter(Boolean);
   const expectedMap = window.__liaKachelfolgeExpected || {};
-  const uids = Object.keys(expectedMap);
-  const matchingUids: string[] = [];
 
-  const uidNode = btn.closest?.("[data-kf-uid]");
-  const directUid = String(uidNode?.getAttribute?.("data-kf-uid") || "").trim();
-  if (directUid && expectedMap[directUid]) matchingUids.push(directUid);
+  if (isMacroMode) {
+    const matchingUidsSet = new Set<string>();
 
-  for (const uid of uids) {
-    const wrap = document.getElementById("kachelfolge-wrap-" + uid);
-    if (wrap?.contains(btn) && !matchingUids.includes(uid)) matchingUids.push(uid);
-  }
-
-  if (!matchingUids.length) {
-    let cur = btn.parentElement;
-    for (let depth = 0; cur && cur !== document.body && depth < 12; depth++) {
-      const tag = (cur.tagName || "").toUpperCase();
-      if (/^(MAIN|ARTICLE|BODY|HTML)$/.test(tag)) break;
-      const curUid = String(cur.getAttribute?.("data-kf-uid") || "").trim();
-      if (curUid && expectedMap[curUid] && !matchingUids.includes(curUid)) matchingUids.push(curUid);
-      for (const uid of uids) {
-        const wrap = document.getElementById("kachelfolge-wrap-" + uid);
-        if (wrap && cur.contains(wrap) && !matchingUids.includes(uid)) matchingUids.push(uid);
-      }
-      if (matchingUids.length) break;
-      cur = cur.parentElement;
+    function addUidFromNode(node: Element | null | undefined): void {
+      const uid = String(node?.getAttribute?.("data-kf-uid") || "").trim();
+      if (!uid) return;
+      if (!Array.isArray(expectedMap[uid]) || expectedMap[uid].length === 0) return;
+      matchingUidsSet.add(uid);
     }
+
+    addUidFromNode(btn.closest?.("[data-kf-uid]") || null);
+    addUidFromNode(tileRoot?.closest?.("[data-kf-uid]") || null);
+    addUidFromNode(tileRoot);
+
+    if (tileRoot?.querySelectorAll) {
+      Array.from(tileRoot.querySelectorAll("[data-kf-uid]")).forEach(n => addUidFromNode(n));
+    }
+
+    const matchingUids = Array.from(matchingUidsSet);
+    if (!matchingUids.length) return;
+
+    const combinedExpectedRaw: string[] = [];
+    matchingUids.forEach(u => {
+      const e = expectedMap[u];
+      if (Array.isArray(e)) combinedExpectedRaw.push(...e);
+    });
+    const combinedExpected = combinedExpectedRaw.map(v => norm(v)).filter(Boolean);
+    groupUid = matchingUids.join("+");
+
+    if (combinedExpected.length !== targets.length) {
+      dlog("kf: skip custom-check weak-expected uid='" + groupUid + "' expectedRaw='" + combinedExpectedRaw.join("|") + "'");
+      return;
+    }
+
+    expectedForLog = combinedExpected;
+    isCorrect = combinedExpected.length > 0 && sameMultiset(actualSync, combinedExpected);
+  } else {
+    // Plain div.Kachel: require strict position-based expected sequence.
+    const localUids = new Set<string>();
+    const addLocalUid = (node: Element | null | undefined) => {
+      const uid = String(node?.getAttribute?.("data-kf-uid") || "").trim();
+      if (!uid) return;
+      localUids.add(uid);
+    };
+
+    addLocalUid(btn.closest?.("[data-kf-uid]") || null);
+    addLocalUid(tileRoot?.closest?.("[data-kf-uid]") || null);
+    addLocalUid(tileRoot);
+    if (tileRoot?.querySelectorAll) {
+      Array.from(tileRoot.querySelectorAll("[data-kf-uid]")).forEach(n => addLocalUid(n));
+    }
+
+    const candidates = Array.from(localUids)
+      .map(uid => ({ uid, expected: Array.isArray(expectedMap[uid]) ? expectedMap[uid].map(v => norm(v)).filter(Boolean) : [] }))
+      .filter(item => item.expected.length === targets.length);
+
+    if (!candidates.length) return;
+
+    const chosen = candidates[0];
+    groupUid = chosen.uid;
+    expectedForLog = chosen.expected;
+    isCorrect = actualSync.length === chosen.expected.length &&
+      actualSync.every((val, idx) => normKey(val) === normKey(chosen.expected[idx]));
   }
-  if (!matchingUids.length) return;
 
-  const combinedExpected: string[] = [];
-  matchingUids.forEach(u => {
-    const e = expectedMap[u];
-    if (Array.isArray(e)) combinedExpected.push(...e);
-  });
-  const groupUid = matchingUids.join("+");
-
-  const isKfCorrect = combinedExpected.length > 0 && sameMultiset(actualSync, combinedExpected);
-  const isCorrect = isKfCorrect || (!matchingUids.length && isNativeIdTextCorrect);
   if (!isCorrect) return;
 
   try { ev.stopImmediatePropagation(); } catch (e) {}
 
   window.setTimeout(() => {
     if (!tileRoot) return;
-    dlog("kf: check uid='" + groupUid + "' actual='" + actualSync.join("|") + "' expected='" + combinedExpected.join("|") + "' ok=1");
+    dlog("kf: check uid='" + groupUid + "' actual='" + actualSync.join("|") + "' expected='" + expectedForLog.join("|") + "' ok=1");
 
     const quizNode = quizNodeFrom(btn) || tileRoot;
     if (quizNode?.classList) {

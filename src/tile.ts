@@ -691,10 +691,13 @@ export function setupStandaloneKachelAreas(root: Document | Element): void {
       window.__liaKachelfolgeExpected[uid] = inferred;
       dlog("kf: inline area setup uid='" + uid + "' expected='" + inferred.join("|") + "' from=instruction");
     } else {
-      const { complete, expected } = expectedTextsByTargetIds(block);
-      if (complete && expected.length) {
-        window.__liaKachelfolgeExpected[uid] = expected.map((v: string) => String(v || "").trim());
-        dlog("kf: inline area setup uid='" + uid + "' expected='" + window.__liaKachelfolgeExpected[uid].join("|") + "' from=ids");
+      const hasExisting = Array.isArray(window.__liaKachelfolgeExpected[uid]) && window.__liaKachelfolgeExpected[uid].length > 0;
+      if (!hasExisting) {
+        const { complete, expected } = expectedTextsByTargetIds(block);
+        if (complete && expected.length) {
+          window.__liaKachelfolgeExpected[uid] = expected.map((v: string) => String(v || "").trim());
+          dlog("kf: inline area setup uid='" + uid + "' expected='" + window.__liaKachelfolgeExpected[uid].join("|") + "' from=ids-initial");
+        }
       }
     }
         hydrateInlineExpectedFromSource(blocks);

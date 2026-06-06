@@ -180,14 +180,16 @@ Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
 </div>
 ```
 
+
+
 <div class="Kachel">
 
 Wähle in den ersten drei Feldern gelb und danach rot aus.
 
 <!-- data-solution-button="5" data-randomize="true" -->
-In diese Lücke muss [->[(gelb)]] rein. \
-In diese muss auch [->[(gelb)]] rein und in diese [->[(gelb)]] auch. \
-Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
+In diese Lücke muss [->[(Test)]] rein. \
+In diese muss auch [->[(Test)]] rein und in diese [->[(Nope)]] auch. \
+Das Adjektiv [->[(Nope)]] ist [->[(Test)]].
 
 </div>
 

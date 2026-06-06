@@ -218,6 +218,8 @@ export function extractTargetId(node: Element): number | null {
 }
 
 export function extractSourceId(node: Element): number | null {
+  // Targets may carry an id in their dragtarget payload; never treat them as sources.
+  if (isTileTarget(node)) return null;
   const tries: [string, string][] = [
     ["onclick", "dragsource"], ["onkeydown", "dragsource"],
     ["ondragstart", "dragsource"], ["ondragend", "dragsource"],
@@ -383,20 +385,16 @@ export function expectedTextsByTargetIds(tileRoot: Element | null): { expected: 
   out.totalTargets = targets.length;
   if (!targets.length) return out;
 
-  const allSources = sourceCandidates(tileRoot);
+  const allSources = sourceCandidates(tileRoot).filter(n => !isTileTarget(n) && extractSourceId(n) !== null);
   const outsideSources = allSources.filter(n => !isInsideAnyTarget(n, targets));
-  const insideSources = allSources.filter(n => isInsideAnyTarget(n, targets));
 
   for (const t of targets) {
     const tid = extractTargetId(t);
     if (tid === null) { out.expected.push(""); continue; }
     out.knownTargets += 1;
     let found: Element | null = null;
-    for (const pool of [outsideSources, insideSources, allSources]) {
-      for (const s of pool) {
-        if (extractSourceId(s) === tid) { found = s; break; }
-      }
-      if (found) break;
+    for (const s of outsideSources) {
+      if (extractSourceId(s) === tid) { found = s; break; }
     }
     out.expected.push(found ? targetDisplayText(found) : "");
   }
