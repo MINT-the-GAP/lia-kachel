@@ -90,12 +90,12 @@ export function targetDisplayText(node: Element): string {
 export function quizNodeFrom(node: Element | null): Element | null {
   if (!node) return null;
   if (node.closest) {
-    const q = node.closest(".lia-quiz, lia-quiz");
+    const q = node.closest(".lia-quiz");
     if (q) return q;
   }
   let cur: Element | null = node;
   while (cur && cur !== document.body) {
-    if (cur.matches && cur.matches(".lia-quiz, lia-quiz")) return cur;
+    if (cur.matches && cur.matches(".lia-quiz")) return cur;
     cur = cur.parentElement;
   }
   return null;
@@ -111,7 +111,7 @@ export function tileRootFrom(node: Element | null): Element | null {
   }
   let cur: Element | null = node;
   while (cur && cur !== document.body) {
-    const q = cur.querySelectorAll ? cur.querySelectorAll(".lia-quiz, lia-quiz") : [];
+    const q = cur.querySelectorAll ? cur.querySelectorAll(".lia-quiz") : [];
     if (q.length === 1 && targetNodes(cur).length > 0) return cur;
     cur = cur.parentElement;
   }

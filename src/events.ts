@@ -46,7 +46,7 @@ export function installAllEventListeners(): void {
   }
 
   function blockIfFrozenQuizEvent(ev: Event, label: string): boolean {
-    const quiz = (ev as any).target?.closest?.(".lia-quiz, lia-quiz");
+    const quiz = (ev as any).target?.closest?.(".lia-quiz");
     if (!quiz) return false;
     const frozenAttr = String(quiz.getAttribute?.("data-kf-frozen") || "") === "1";
     if (!frozenAttr && !isSolvedOrResolvedQuizNode(quiz)) return false;
@@ -258,7 +258,7 @@ export function installAllEventListeners(): void {
     const actionBtn = (ev.target as Element)?.closest?.(".lia-quiz__check, .lia-quiz__resolve");
     if (blockIfFrozenQuizEvent(ev, "click-frozen")) return;
     if (actionBtn) {
-      const actionQuiz = actionBtn.closest?.(".lia-quiz, lia-quiz") || null;
+      const actionQuiz = actionBtn.closest?.(".lia-quiz") || null;
       const actionRoot = tileRootFrom(actionBtn) || (actionQuiz ? tileRootFrom(actionQuiz) : null);
       const isResolveAction = actionBtn.classList?.contains("lia-quiz__resolve");
       if (isResolveAction) {
@@ -273,7 +273,7 @@ export function installAllEventListeners(): void {
       }
       if (!isResolveAction) {
         window.setTimeout(() => {
-          const q = actionQuiz?.isConnected ? actionQuiz : actionBtn.closest?.(".lia-quiz, lia-quiz") || null;
+          const q = actionQuiz?.isConnected ? actionQuiz : actionBtn.closest?.(".lia-quiz") || null;
           const r = tileRootFrom(actionBtn) || (q ? tileRootFrom(q) : null);
           if (isQuizSuccessState(q)) rememberFrozenQuiz(q, r, "check-success");
         }, 80);

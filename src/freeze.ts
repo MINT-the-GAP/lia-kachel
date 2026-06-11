@@ -93,7 +93,7 @@ function buildStableQuizSignatureKey(quiz: Element | null, tileRoot: Element | n
 
   if (localIndex < 0) {
     try {
-      const fallbackRoots = Array.from(document.querySelectorAll?.(".Kachel, .kachelfolge-wrap, [id^='kachelfolge-wrap-'], .lia-quiz, lia-quiz") || [])
+      const fallbackRoots = Array.from(document.querySelectorAll?.(".Kachel, .kachelfolge-wrap, [id^='kachelfolge-wrap-'], .lia-quiz") || [])
         .filter(el => el === root || targetNodes(el).length > 0);
       localIndex = fallbackRoots.indexOf(root);
     } catch (e) {}
@@ -224,7 +224,7 @@ export function freezeSolvedTileQuiz(tileRoot: Element, quizNode: Element | null
 }
 
 export function freezeResolvedQuizzesInDocument(reason: string): void {
-  Array.from(document.querySelectorAll?.(".lia-quiz, lia-quiz") || []).forEach(quiz => {
+  Array.from(document.querySelectorAll?.(".lia-quiz") || []).forEach(quiz => {
     const tileRoot = tileRootFrom(quiz) || quiz.closest?.(".Kachel, .kachelfolge-wrap, [id^='kachelfolge-wrap-']") || null;
     if (!isSolvedOrResolvedQuizNode(quiz) && !shouldFreezeByMemory(quiz, tileRoot)) return;
     try { restoreQuizFeedbackFromMemory(quiz, tileRoot, reason || "freeze-resolved"); } catch (e) {}
