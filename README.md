@@ -34,15 +34,52 @@ window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
 
   function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
 
+  // Erkennt die echten Drop-Targets anhand ihrer LiaScript-Signatur (cmd:'dragtarget'/'dragenter'),
+  // unabhaengig davon, ob bereits data-kf-uid gesetzt wurde oder wie tief sie verschachtelt sind.
+  function isSeqTarget(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (String(el.getAttribute("data-kf-seq-dummy") || "") === "1") return false;
+    var attrs = ["onclick", "onkeydown", "ondragover", "ondragleave", "ondrop"];
+    for (var i = 0; i < attrs.length; i++) {
+      if (/cmd\s*:\s*['"](dragtarget|dragenter)['"]/i.test(String(el.getAttribute(attrs[i]) || ""))) return true;
+    }
+    return false;
+  }
+
+  // Versteckt im seq-Modus per CSS standardmaessig ALLE Targets, bevor LiaScript sie rendert.
+  // Dadurch blitzt die Gesamtzahl der gesuchten Kacheln nie auf. Sichtbar wird nur, was
+  // das JS aktiv mit data-kf-seq-visible="1" freigibt (Reihenfolge: spaeter im Stylesheet => gewinnt).
+  function ensureSeqHideStyle() {
+    if (document.getElementById("kf-seq-global-style")) return;
+    var style = document.createElement("style");
+    style.id = "kf-seq-global-style";
+    style.textContent =
+      "[data-kf-mode='seq'] [onclick*='dragtarget']," +
+      "[data-kf-mode='seq'] [onkeydown*='dragtarget']," +
+      "[data-kf-mode='seq'] [ondragover*='dragtarget']," +
+      "[data-kf-mode='seq'] [ondragleave*='dragtarget']," +
+      "[data-kf-mode='seq'] [ondrop*='dragtarget']," +
+      "[data-kf-mode='seq'] [onclick*='dragenter']," +
+      "[data-kf-mode='seq'] [onkeydown*='dragenter']," +
+      "[data-kf-mode='seq'] [ondragover*='dragenter']," +
+      "[data-kf-mode='seq'] [ondragleave*='dragenter']," +
+      "[data-kf-mode='seq'] [ondrop*='dragenter']," +
+      "[data-kf-mode='seq'] [data-kf-seq-dummy='1']{display:none !important;}" +
+      "[data-kf-mode='seq'] [data-kf-seq-visible='1']{display:inline-block !important;}";
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   function setupSequentialTargets(wrap, expectedCount) {
     if (!wrap || expectedCount <= 0) return;
+    ensureSeqHideStyle();
+    if (wrap.__kfSeqInit) return;           // nur einmal pro wrap einen Observer registrieren
+    wrap.__kfSeqInit = true;
+
     function collectRealTargets() {
-      return Array.prototype.slice.call(wrap.children || []).filter(function (el) {
-        if (!el || !(el instanceof Element)) return false;
-        if (String(el.getAttribute("data-kf-seq-dummy") || "") === "1") return false;
-        if (String(el.getAttribute("data-kf-uid") || "") !== uid) return false;
-        return true;
-      });
+      var nodes = wrap.querySelectorAll
+        ? Array.prototype.slice.call(wrap.querySelectorAll("[onclick],[onkeydown],[ondragover],[ondragleave],[ondrop]"))
+        : [];
+      return nodes.filter(function (el) { return isSeqTarget(el); });
     }
     function ensureDummy(realTargets) {
       if (!realTargets.length) return null;
@@ -65,9 +102,10 @@ window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
     }
     function setVisible(el, on) {
       if (!el) return;
-      if (typeof el.dataset.kfSeqOrigDisplay === "undefined") el.dataset.kfSeqOrigDisplay = el.style.display || "";
-      if (on) { el.style.display = el.dataset.kfSeqOrigDisplay || "inline-block"; el.style.visibility = ""; }
-      else { el.style.display = "none"; }
+      var cur = el.getAttribute("data-kf-seq-visible") === "1";
+      if (on === cur) return;               // keine redundanten Attribut-Mutationen => kein Observer-Loop
+      if (on) { try { el.setAttribute("data-kf-seq-visible", "1"); } catch(e) {} }
+      else { try { el.removeAttribute("data-kf-seq-visible"); } catch(e) {} }
     }
     function updateSequentialVisibility() {
       var realTargets = collectRealTargets();
@@ -87,6 +125,10 @@ window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
     window.setTimeout(updateSequentialVisibility, 700);
   }
 
+  // CSS sofort injizieren (synchron, noch bevor LiaScript die Targets rendert),
+  // damit es im seq-Modus zu keinem Zeitpunkt einen Flash aller Felder gibt.
+  if (mode === "seq") ensureSeqHideStyle();
+
   function initWrap() {
     var wrap = document.getElementById("kachelfolge-wrap-" + uid);
     if (!wrap) return false;
@@ -97,6 +139,7 @@ window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
     return true;
   }
 
+  initWrap();   // Observer so frueh wie moeglich registrieren (wrap existiert bereits)
   [0, 30, 120, 260, 700].forEach(function(delay) {
     window.setTimeout(initWrap, delay);
   });
@@ -160,6 +203,7 @@ Wähle alle roten Farbtöne aus:
 @KachelfolgeN(`[->[(Karmesin)]][->[(Scharlach)]][->[(Rubinrot)|Kobalt]]`)
 ```
 
+<!-- data-randomize="true" -->
 Wähle alle roten Farbtöne aus:
 @KachelfolgeN(`[->[(Karmesin)]][->[(Scharlach)]][->[(Rubinrot)|Kobalt]]`)
 
@@ -187,9 +231,9 @@ Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
 Wähle in den ersten drei Feldern gelb und danach rot aus.
 
 <!-- data-solution-button="5" data-randomize="true" -->
-In diese Lücke muss [->[(Test)]] rein. \
-In diese muss auch [->[(Test)]] rein und in diese [->[(Nope)]] auch. \
-Das Adjektiv [->[(Nope)]] ist [->[(Test)]].
+In diese Lücke muss [->[(gelb)]] rein. \
+In diese muss auch [->[(gelb)]] rein und in diese [->[(gelb)]] auch. \
+Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
 
 </div>
 
