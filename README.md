@@ -1,215 +1,167 @@
 <!--
-author:   Martin Lommatzsch, Jihad Hyadi
-version:  0.0.1
-language: de
-comment:  lia-Kachel plugin — Kachelfolge drag-and-drop tile quizzes with touch support
+author:     Martin Lommatzsch, Jihad Hyadi
+version:    0.0.1
+language:   de
+narrator:   Deutsch Female
+comment:    Native LiaScript-Kacheln mit Touch-Drag-and-Drop, Kachelfolgen und automatischer Inhaltsprüfung in .Kachel-Regionen.
+repository: https://github.com/MINT-the-GAP/lia-kachel
 
 script: ./dist/index.js
+link: ./styles.css
 
-@onload
-window.__liaKachelfolgeExpected = window.__liaKachelfolgeExpected || {};
-window.__liaKfAssignedSources = window.__liaKfAssignedSources || new WeakMap();
+@Kachelfolge: @Kachelfolge_(@uid,`@0`)
+
+@KachelfolgeN: @KachelfolgeN_(@uid,`@0`)
+
+@Kachelfolge_
+<span hidden aria-hidden="true" id="lia-kachelfolge-@0" data-lia-kachelfolge="@0"></span>@1
+<script>
+window.LiaKachel.kachelfolge.check("@0", "@'1")
+</script>
+
 @end
 
-@Kachelfolge: @KachelfolgeBase_(@uid,classic,`@0`)
-@KachelfolgeN: @KachelfolgeBase_(@uid,seq,`@0`)
-
-@KachelfolgeBase_
-<div id="kachelfolge-wrap-@0" class="kachelfolge-wrap" data-kf-uid="@0" data-kf-mode="@1">
-  @2
-</div>
-<script modify="false">
-(function () {
-  var uid = "@0";
-  var mode = "@1";
-  var raw = String.raw`@2`;
-  var expected = [];
-  raw.replace(/\[->\[([^\]]*)\]\]/g, function (_, inner) {
-    var m = inner.match(/\(([^)]*)\)/);
-    if (m) expected.push(String(m[1] || "").trim());
-    return _;
-  });
-  window.__liaKachelfolgeExpected = window.__liaKachelfolgeExpected || {};
-  window.__liaKachelfolgeExpected[uid] = expected;
-
-  function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
-
-  // Erkennt die echten Drop-Targets anhand ihrer LiaScript-Signatur (cmd:'dragtarget'/'dragenter'),
-  // unabhaengig davon, ob bereits data-kf-uid gesetzt wurde oder wie tief sie verschachtelt sind.
-  function isSeqTarget(el) {
-    if (!el || el.nodeType !== 1) return false;
-    if (String(el.getAttribute("data-kf-seq-dummy") || "") === "1") return false;
-    var attrs = ["onclick", "onkeydown", "ondragover", "ondragleave", "ondrop"];
-    for (var i = 0; i < attrs.length; i++) {
-      if (/cmd\s*:\s*['"](dragtarget|dragenter)['"]/i.test(String(el.getAttribute(attrs[i]) || ""))) return true;
-    }
-    return false;
-  }
-
-  // Versteckt im seq-Modus per CSS standardmaessig ALLE Targets, bevor LiaScript sie rendert.
-  // Dadurch blitzt die Gesamtzahl der gesuchten Kacheln nie auf. Sichtbar wird nur, was
-  // das JS aktiv mit data-kf-seq-visible="1" freigibt (Reihenfolge: spaeter im Stylesheet => gewinnt).
-  function ensureSeqHideStyle() {
-    if (document.getElementById("kf-seq-global-style")) return;
-    var style = document.createElement("style");
-    style.id = "kf-seq-global-style";
-    style.textContent =
-      "[data-kf-mode='seq'] [onclick*='dragtarget']," +
-      "[data-kf-mode='seq'] [onkeydown*='dragtarget']," +
-      "[data-kf-mode='seq'] [ondragover*='dragtarget']," +
-      "[data-kf-mode='seq'] [ondragleave*='dragtarget']," +
-      "[data-kf-mode='seq'] [ondrop*='dragtarget']," +
-      "[data-kf-mode='seq'] [onclick*='dragenter']," +
-      "[data-kf-mode='seq'] [onkeydown*='dragenter']," +
-      "[data-kf-mode='seq'] [ondragover*='dragenter']," +
-      "[data-kf-mode='seq'] [ondragleave*='dragenter']," +
-      "[data-kf-mode='seq'] [ondrop*='dragenter']," +
-      "[data-kf-mode='seq'] [data-kf-seq-dummy='1']{display:none !important;}" +
-      "[data-kf-mode='seq'] [data-kf-seq-visible='1']{display:inline-block !important;}";
-    (document.head || document.documentElement).appendChild(style);
-  }
-
-  function setupSequentialTargets(wrap, expectedCount) {
-    if (!wrap || expectedCount <= 0) return;
-    ensureSeqHideStyle();
-    if (wrap.__kfSeqInit) return;           // nur einmal pro wrap einen Observer registrieren
-    wrap.__kfSeqInit = true;
-
-    function collectRealTargets() {
-      var nodes = wrap.querySelectorAll
-        ? Array.prototype.slice.call(wrap.querySelectorAll("[onclick],[onkeydown],[ondragover],[ondragleave],[ondrop]"))
-        : [];
-      return nodes.filter(function (el) { return isSeqTarget(el); });
-    }
-    function ensureDummy(realTargets) {
-      if (!realTargets.length) return null;
-      var existing = wrap.querySelector("[data-kf-seq-dummy='1']");
-      if (existing) return existing;
-      var src = realTargets[realTargets.length - 1] || realTargets[0];
-      var dummy = document.createElement(src && src.tagName ? src.tagName : "span");
-      try { dummy.setAttribute("data-kf-seq-dummy", "1"); } catch(e) {}
-      try { dummy.setAttribute("data-kf-uid", uid); } catch(e) {}
-      dummy.className = "lia-target-placeholder kf-seq-dummy";
-      try { dummy.style.cssText = String(src.getAttribute("style") || src.style.cssText || ""); } catch(e) {}
-      dummy.textContent = "✛";
-      dummy.style.pointerEvents = "none";
-      wrap.appendChild(dummy);
-      return dummy;
-    }
-    function isFilled(el) {
-      var t = norm(el && el.textContent || "");
-      return !!t && t !== "✛" && t !== "+";
-    }
-    function setVisible(el, on) {
-      if (!el) return;
-      var cur = el.getAttribute("data-kf-seq-visible") === "1";
-      if (on === cur) return;               // keine redundanten Attribut-Mutationen => kein Observer-Loop
-      if (on) { try { el.setAttribute("data-kf-seq-visible", "1"); } catch(e) {} }
-      else { try { el.removeAttribute("data-kf-seq-visible"); } catch(e) {} }
-    }
-    function updateSequentialVisibility() {
-      var realTargets = collectRealTargets();
-      if (!realTargets.length) return;
-      var dummy = ensureDummy(realTargets);
-      var filled = 0;
-      for (var i = 0; i < realTargets.length; i++) { if (isFilled(realTargets[i])) filled += 1; }
-      var visibleReal = Math.min(filled + 1, realTargets.length);
-      realTargets.forEach(function (el, idx) { setVisible(el, idx < visibleReal); });
-      if (dummy) setVisible(dummy, filled >= Math.min(expectedCount, realTargets.length));
-    }
-    var obs = new MutationObserver(updateSequentialVisibility);
-    obs.observe(wrap, { subtree: true, childList: true, characterData: true, attributes: true });
-    updateSequentialVisibility();
-    window.setTimeout(updateSequentialVisibility, 60);
-    window.setTimeout(updateSequentialVisibility, 260);
-    window.setTimeout(updateSequentialVisibility, 700);
-  }
-
-  // CSS sofort injizieren (synchron, noch bevor LiaScript die Targets rendert),
-  // damit es im seq-Modus zu keinem Zeitpunkt einen Flash aller Felder gibt.
-  if (mode === "seq") ensureSeqHideStyle();
-
-  function initWrap() {
-    var wrap = document.getElementById("kachelfolge-wrap-" + uid);
-    if (!wrap) return false;
-    wrap.setAttribute("data-kf-uid", uid);
-    var candidates = wrap.querySelectorAll ? Array.prototype.slice.call(wrap.querySelectorAll("[onclick],[ondragover],[ondragstart],[class*='lia-quiz']")) : [];
-    candidates.forEach(function(el) { try { el.setAttribute("data-kf-uid", uid); } catch(e) {} });
-    if (mode === "seq") setupSequentialTargets(wrap, expected.length);
-    return true;
-  }
-
-  initWrap();   // Observer so frueh wie moeglich registrieren (wrap existiert bereits)
-  [0, 30, 120, 260, 700].forEach(function(delay) {
-    window.setTimeout(initWrap, delay);
-  });
-})();
+@KachelfolgeN_
+<span hidden aria-hidden="true" id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive"></span>@1
+<script>
+window.LiaKachel.kachelfolge.check("@0", "@'1")
 </script>
+
 @end
 
 -->
 
 # lia-Kachel
 
-LiaScript-Plugin für verbesserte **Kachel-Quizarten** (Drag-and-Drop Tile Quizzes) mit:
+Das Template hat drei klar getrennte Schichten:
 
-- Abgerundeten Kacheln passend zum LiaScript-Design-System
-- **Touch-Unterstützung** für Drag & Drop auf Mobilgeräten
-- **Cross-Root-Drop-Emulation** (Kacheln aus verschiedenen Quiz-Bereichen)
-- **Reihenfolge-unabhängige Auswertung** mit `@Kachelfolge`
-- **Sequenzielle Anzeige** (nur nächstes Feld sichtbar) mit `@KachelfolgeN`
-- **Quiz-Einfrieren** nach korrekter Lösung oder Auflösen
+- styles.css gestaltet alle nativen Quell-, Ziel-, belegten und aufgelösten
+  LiaScript-Kacheln.
+- src/ enthält die wartbare TypeScript-Quelle für Touch, Stift,
+  reihenfolgeunabhängige Auswertung, progressive Zielanzeige und die
+  automatische Inhaltsprüfung in `.Kachel`-Regionen.
+- dist/index.js ist das daraus gebaute, direkt importierbare Browser-Skript.
 
-__Try it on LiaScript:__
-https://liascript.github.io/course/?https://raw.githubusercontent.com/MINT-the-GAP/lia-Kachel/main/README.md
+Die Oberfläche bleibt vollständig nativ: Das Projekt erzeugt keine eigenen
+Targets, Sources, Prüfbuttons oder Rückmeldungen. Die Touch-Schicht übersetzt
+Gesten in LiaScripts Ereignisfolge. `@Kachelfolge` und `@KachelfolgeN`
+ergänzen die native Auswertung. Ein `<div class="Kachel">` schaltet für die
+darin enthaltenen nativen Multi-Drop-Quizze automatisch die zielweise
+Inhaltsprüfung ein. Versuche, Scoring, Persistenz, Auflösen und Feedback
+bleiben immer bei LiaScript.
 
-__See the project on GitHub:__
-https://github.com/MINT-the-GAP/lia-Kachel
+## Funktionsumfang
 
----
+- Drag-and-Drop mit Touch und Stift über Pointer Events
+- Fallback über Touch Events für Browser ohne Pointer Events
+- Bewegungsschwelle von 8 px, damit ein Antippen ein Antippen bleibt
+- eigener, nicht interaktiver Drag-Ghost
+- automatisches vertikales Scrollen in langen Quizzen
+- Verschieben und Entfernen bereits belegter Kacheln
+- sichere Trennung mehrerer Quizze über LiaScripts internen track-Pfad
+- idempotente Installation bei mehrfachen oder verschachtelten Imports
+- `@Kachelfolge` mit beliebig vielen Targets und beliebig vielen unabhängigen
+  Makroaufrufen
+- `@KachelfolgeN` mit anfangs genau einem sichtbaren Target und schrittweiser
+  Freigabe weiterer nativer Targets
+- `<div class="Kachel">` für zielweise Inhaltsprüfung mit austauschbaren,
+  gleich beschrifteten Sources – ohne zusätzliches Makro oder Skript im Kurs
+- reihenfolgeunabhängige Prüfung anhand nativer Kachel-Identitäten statt Text
 
 ## Einbindung
 
-`import: https://raw.githubusercontent.com/MINT-the-GAP/lia-Kachel/main/README.md`
-
----
-
-## Makros
-
-### `@Kachelfolge` — Reihenfolge egal
-
-Erzeugt eine Kachelsequenz, bei der die Reihenfolge der Antworten egal ist.
+Für reproduzierbare Kurse empfiehlt sich der feste Versionsimport:
 
 ```markdown
-<!-- data-randomize="true" -->
-Wähle die richtigen Farben aus:
-@Kachelfolge(`[->[(rot)]][->[(blau)]][->[(grün)|Haus]]`)
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-kachel/0.6.0/README.md
 ```
 
-**Syntax der Kacheln:** `[->[(Antwort)]]` oder `[->[(Antwort)|Beschriftung]]`
-
-- `(Antwort)` — die korrekte Antwort (in runden Klammern)
-- Alternativen ohne Klammern werden als falsche Optionen angeboten (z.B. `[->[(rot)|blau|grün]]`)
-
-Wähle die richtigen Farben aus:
-@Kachelfolge(`[->[(rot)]][->[(blau)]][->[(grün)|Haus]]`)
-
-### `@KachelfolgeN` — Sequenziell (unbekannte Anzahl)
-
-Zeigt immer nur das nächste freie Feld an — nützlich wenn die Anzahl der zu wählenden Kacheln unbekannt ist.
+Wer bewusst immer den neuesten Stand verwenden möchte, importiert `main`:
 
 ```markdown
-Wähle alle roten Farbtöne aus:
-@KachelfolgeN(`[->[(Karmesin)]][->[(Scharlach)]][->[(Rubinrot)|Kobalt]]`)
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-kachel/main/README.md
 ```
 
+Für die lokale Entwicklung kann diese README.md direkt im LiaScript-Editor
+oder über den LiaScript-Entwicklungsserver geöffnet werden.
+
+## Native Source und Targets
+
+Diese Aufgabe prüft leere und belegte Targets, richtige und falsche Quellen
+sowie eine zufällige Reihenfolge:
+
 <!-- data-randomize="true" -->
-Wähle alle roten Farbtöne aus:
-@KachelfolgeN(`[->[(Karmesin)]][->[(Scharlach)]][->[(Rubinrot)|Kobalt]]`)
+Ziehe die Farben in die drei Ziele:
+[->[(Rot)|Haus]] [->[(Blau)|Katze]] [->[(Grün)|Auto]].
 
-### `<div class="Kachel">` — Inline-Kachelbereich
+## Doppelte Beschriftungen und Quizgrenzen
 
-Für normale LiaScript-Tile-Quizze (ohne Makro) kann der Drag-&-Drop-Bereich mit einem `<div class="Kachel">` umschlossen werden, damit das Plugin ihn erkennt und Touch-Support aktiviert:
+Dieses zweite Quiz besitzt absichtlich doppelte Beschriftungen. Eine
+Touch-Quelle aus dem ersten Quiz darf kein Target dieses Quiz markieren.
+
+<!-- data-randomize="true" -->
+In diese Lücke gehört [->[(gelb)]], in diese ebenfalls [->[(gelb)|blau]].
+
+## Reihenfolgeunabhängige Kachelfolge
+
+Jede `[->[...]]`-Einheit erzeugt ein Target. Pro Einheit ist genau eine Option
+durch runde Klammern als richtig markiert; die richtige Option darf vorne,
+mittig oder hinten stehen. Daneben können beliebig viele falsche Kacheln
+stehen. Bei einer Einheit ohne Alternativen ist die einzige Kachel wie in
+LiaScript automatisch richtig.
+
+Die richtigen Kacheln dürfen in **beliebiger Reihenfolge** in den Targets
+liegen. Für vier richtige Kacheln sind also beispielsweise `1-2-3-4`,
+`4-2-3-1` und jede andere Permutation korrekt.
+
+<!-- data-randomize="true" -->
+Ordne die vier richtigen Kacheln beliebig an:
+@Kachelfolge(`[->[(richtig1)|falschA]][->[(richtig2)|falschB|falschC]][->[(richtig3)]][->[(richtig4)|falschD]]`)
+
+Die Auswertung verwendet intern die native LiaScript-Adresse jeder Quelle
+`[Ursprungs-Target, Optionsindex]`. Deshalb bleiben doppelte Beschriftungen
+unterscheidbar: Eine gleichnamige falsche Kachel wird nicht versehentlich als
+richtig gewertet. Mehrere `@Kachelfolge`-Aufrufe auf derselben Folie sind
+voneinander isoliert.
+
+## Kachelfolge mit unbekannter Länge
+
+`@KachelfolgeN` verwendet dieselbe Syntax und dieselbe
+reihenfolgeunabhängige Identitätsprüfung. Der Unterschied liegt ausschließlich
+in der Anzeige: Zu Beginn ist genau ein natives Target sichtbar. Sobald alle
+aktuell sichtbaren Targets belegt sind, erscheint das nächste. Erst wenn das
+letzte Target belegt wurde und kein weiteres erscheint, ist die Länge für die
+lernende Person erkennbar.
+
+Ob eine eingesetzte Kachel richtig oder falsch ist, spielt für das Aufdecken
+keine Rolle. Beim Verschieben oder Entfernen wird kein zusätzliches Target
+freigeschaltet, und ein bereits belegtes Target wird nie ausgeblendet.
+
+<!-- data-randomize="true" -->
+Finde die unbekannt lange Menge und ordne sie beliebig an:
+@KachelfolgeN(`[->[(Kupfer)|Holz]][->[Glas|(Silber)|Stein]][->[(Gold)|Papier]][->[Wasser|(Platin)]]`)
+
+Das Makro erzeugt weiterhin sämtliche Sources und Targets nativ in genau einem
+LiaScript-Quiz. Die noch nicht freigegebenen Targets sind lediglich aus Layout,
+Fokusreihenfolge und Accessibility-Baum ausgeblendet. Es gibt keine
+nachgebauten Targets und keine zweite Auswertungslogik.
+
+Damit die richtige Anzahl nicht aus dem Quellenpool herleitbar ist, sollte die
+Aufgabe falsche Optionen enthalten und mit `data-randomize="true"` gemischt
+werden. Das Makro verbirgt die Targetzahl; inhaltlich offensichtliche Hinweise
+in Beschriftungen oder Aufgabenstellung kann es naturgemäß nicht verbergen.
+
+Ein Makroaufruf gehört jeweils auf eine eigene Zeile. Er darf erklärenden Text,
+aber kein zusätzliches natives `[->[...]]` außerhalb seines Parameters im
+selben Absatz enthalten. Mehrere `@Kachelfolge`- und
+`@KachelfolgeN`-Zeilen dürfen direkt aufeinanderfolgen; jede wird automatisch
+zu einem eigenen Quizabsatz.
+
+## Inhaltsbasierte Kachelregion
+
+Für die Inhaltsprüfung ist kein Makro und kein kurseigenes Skript nötig. Ein
+`div` mit dem Klassentoken `Kachel` umschließt einfach die unveränderte
+native LiaScript-Quizsyntax:
 
 ```markdown
 <div class="Kachel">
@@ -224,7 +176,7 @@ Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
 </div>
 ```
 
-
+Das Beispiel ist direkt ausführbar:
 
 <div class="Kachel">
 
@@ -237,19 +189,100 @@ Das Adjektiv [->[(rot)]] ist [->[pink|grün|(rot)]].
 
 </div>
 
----
+Innerhalb der Region wird jedes Target anhand des **gerenderten Inhalts** der
+eingesetzten Kachel geprüft. Die runden Klammern in der normalen
+LiaScript-Syntax bestimmen weiterhin den Sollinhalt des jeweiligen Targets.
+Physisch verschiedene Sources mit demselben Inhalt sind austauschbar. Für die
+drei `gelb`-Targets darf also jede verfügbare `gelb`-Kachel verwendet
+werden – selbst eine gleichlautende Source, die in ihrer ursprünglichen
+Optionsliste nicht als richtig markiert war. Eine `gelb`-Kachel in einem
+`rot`-Target bleibt falsch.
 
-## Konfiguration
+Beim Prüfen wird nur eine nötige Inhaltszuordnung an die native Quizlogik
+übergeben. LiaScript selbst verarbeitet anschließend genau einen Prüfversuch
+und behält seine eigenen Rückmeldungen, Teilbewertungen, Versuche, Lösung,
+Scoring und Persistenz. Außerhalb eines `div.Kachel` gilt unverändert die
+native Identitätsprüfung.
 
-Die üblichen LiaScript-Quiz-Optionen funktionieren direkt über dem Makro:
+Der Vergleich normalisiert Unicode nach NFC, geschützte Leerzeichen und
+sonstige Whitespace-Folgen. Groß-/Kleinschreibung und Satzzeichen bleiben
+bedeutsam: `x`, `X` und `x.` sind drei verschiedene Inhalte. Maßgeblich
+ist der sichtbare Text; für rein bildliche Kacheln dienen alternativ
+Bild-`alt` oder `aria-label` als Inhalt.
 
-```markdown
-<!-- data-randomize="true" -->
-@Kachelfolge(`[->[(A)]][->[(B)]][->[(C)]]`)
+| Modus | Bewertungsregel |
+| --- | --- |
+| `<div class="Kachel">` | Inhalt muss am jeweiligen Target stimmen; gleichlautende Sources sind austauschbar. |
+| `@Kachelfolge` | Die Menge nativer Quellidentitäten muss stimmen; die Targetreihenfolge ist egal. |
+| `@KachelfolgeN` | Wie `@Kachelfolge`, zusätzlich mit schrittweise sichtbaren Targets. |
 
-<!-- data-solution-button="2" -->
-@Kachelfolge(`[->[(1)]][->[(2)|Label]][->[(3)]]`)
+Eine Region darf beliebig viele native Multi-Drop-Quizabsätze enthalten. Jeder
+Quizabsatz bleibt über seinen LiaScript-Track von allen anderen Quizzen
+isoliert und darf beliebig viele Targets sowie beliebig viele
+Ablenkungsoptionen besitzen. Auch mehrere Regionen auf einer Folie und
+zusätzliche Klassennamen wie `class="Kachel meine-aufgabe"` sind erlaubt.
+Der Klassentoken `Kachel` ist absichtlich großgeschrieben.
 
-<!-- data-show-partial-solution="true" -->
-@Kachelfolge(`[->[(X)]][->[(Y)]]`)
+Die Inhaltsprüfung gilt für native Inline-Multi-Drop-Targets `[->[…]]`.
+Insbesondere ein Quiz mit nur einem Target sollte im Fließtext stehen, zum
+Beispiel `Einzelwert: [->[(solo)]].` Ein Target als alleiniger Inhalt eines
+Absatzes wird von LiaScript als anderer Drop-Typ gerendert und fällt deshalb
+auf die native Standardauswertung zurück. Kann die Bibliothek die kompilierte
+native Lösung nach einem LiaScript-Update nicht eindeutig erkennen, bleibt
+ebenfalls sicherheitshalber die native Standardauswertung aktiv und die
+Browserkonsole erhält genau einen Diagnosehinweis.
+
+## Entwicklung
+
+~~~ text
+npm ci
+npm run verify
+~~~
+
+npm run verify prüft die TypeScript-Typen, baut dist/index.js und testet Parser,
+Identitätsvergleich, zielweise Inhaltsprüfung, progressive Freigabe sowie die
+statischen Auslieferungs- und Importverträge. Das Bundle in dist/ wird mit
+versioniert; es wird nie von Hand bearbeitet.
+
+~~~ text
+src/
+  dom.ts       LiaScript-Selektoren, Quizgrenzen und native DragEvents
+  content.ts   zielweise Prüfung gerenderter Kachelinhalte
+  kachelfolge.ts Parser und nativer, reihenfolgeunabhängiger Validator
+  progressive.ts schrittweise Anzeige nativer Targets
+  touch.ts     Gestenzustand, Ghost, Abbruch und Auto-Scroll
+  index.ts     einmalige Installation
+dist/
+  index.js     generierte JavaScript-Ausgabe
+tests/
+  *.test.mjs  Parser-, Inhalts-, Auslieferungs- und Importverträge
+  fixtures/
+    kachelfolge-import.md
+    kachelfolge-n-import.md
+    kachel-region-import.md
+    touch-import.md
+~~~
+
+## CSS-Variablen
+
+Das Design kann von einem Kurs über folgende Variablen angepasst werden:
+
+```css
+:root {
+  --lia-kachel-radius: 12px;
+  --lia-kachel-background: rgba(var(--lia-grey, 136, 136, 136), 0.14);
+  --lia-kachel-target-min-width: clamp(5.85rem, 14.3vw, 9.1rem);
+  --lia-kachel-min-height: 3rem;
+}
 ```
+
+## Abgrenzung
+
+`@Kachelfolge` verändert ausschließlich die Regel, nach der die vorhandenen
+nativen Sources als Gesamtmenge geprüft werden. `@KachelfolgeN` blendet
+zusätzlich die noch nicht erreichten nativen Targets aus. `div.Kachel`
+vergleicht dagegen ausschließlich den sichtbaren Soll- und Istinhalt am
+jeweiligen Target. Die Region wertet weder Aufgabenprosa noch rohe
+Markdown-Quellen heuristisch aus. Es gibt keine zweite
+Drag-and-Drop-Implementierung, keine DOM-Klone und kein manuell nachgebautes
+Quiz-Feedback.

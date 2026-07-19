@@ -1,0 +1,263 @@
+/*
+ * lia-Kachel — CSS-only baseline
+ *
+ * This stylesheet deliberately targets the semantic attributes emitted by
+ * LiaScript itself. Sources, targets, and quiz controls are sibling blocks in
+ * the rendered DOM, so the tile selectors must not depend on .lia-quiz.
+ */
+
+:root {
+  --lia-kachel-radius: 12px;
+  --lia-kachel-background: rgba(var(--lia-grey, 136, 136, 136), 0.14);
+  --lia-kachel-target-min-width: 5.85rem;
+  --lia-kachel-min-height: 3rem;
+  --lia-kachel-transition-duration: 140ms;
+  --lia-kachel-accent: rgb(var(--color-highlight, 20, 115, 117));
+}
+
+@supports (width: clamp(5.85rem, 14.3vw, 9.1rem)) {
+  :root {
+    --lia-kachel-target-min-width: clamp(5.85rem, 14.3vw, 9.1rem);
+  }
+}
+
+/*
+ * Native tile hooks
+ *
+ * Source:
+ *   span[role='button'][aria-grabbed]
+ *
+ * Target:
+ *   role='button' plus LiaScript's dragtarget/dragenter handlers
+ *
+ * aria-grabbed remains on sources when LiaScript removes interaction handlers
+ * in solved and resolved states. It is therefore the stable source hook.
+ */
+:root span[role='button'][aria-grabbed],
+:root span[role='button'][onclick*='dragtarget'],
+:root span[role='button'][onkeydown*='dragtarget'],
+:root span[role='button'][ondragover*='dragenter'],
+:root p.lia-paragraph > span:not([role])[style*='position: relative'][style*='border: 3px dotted'][style*='vertical-align: middle'] {
+  box-sizing: border-box !important;
+  border-radius: var(--lia-kachel-radius) !important;
+  background-color: var(--lia-kachel-background) !important;
+  transition:
+    background-color var(--lia-kachel-transition-duration) ease,
+    border-color var(--lia-kachel-transition-duration) ease,
+    box-shadow var(--lia-kachel-transition-duration) ease,
+    transform var(--lia-kachel-transition-duration) ease;
+}
+
+/* Empty and filled drop targets. Native border colors and widths are retained
+ * so drag-over and quiz feedback remain visible. Resolved targets no longer
+ * carry a role or event handler, so their exact native paragraph signature is
+ * included as a narrowly scoped fallback. */
+:root span[role='button'][onclick*='dragtarget'],
+:root span[role='button'][onkeydown*='dragtarget'],
+:root span[role='button'][ondragover*='dragenter'],
+:root p.lia-paragraph > span:not([role])[style*='position: relative'][style*='border: 3px dotted'][style*='vertical-align: middle'] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: var(--lia-kachel-target-min-width) !important;
+  min-height: var(--lia-kachel-min-height) !important;
+  max-width: 100% !important;
+  padding-left: 0.52rem !important;
+  padding-right: 0.52rem !important;
+  padding-inline: 0.52rem !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Sources in the answer bank. A source remains covered after interaction is
+ * disabled because aria-grabbed is retained by LiaScript. */
+span[role='button'][aria-grabbed] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: var(--lia-kachel-min-height) !important;
+  max-width: 100% !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+/* Only genuinely interactive sources advertise drag interaction. */
+:root span[role='button'][aria-grabbed][onclick*='dragsource'],
+:root span[role='button'][aria-grabbed][onkeydown*='dragsource'],
+:root span[role='button'][aria-grabbed][ondragstart*='dragstart'] {
+  cursor: grab !important;
+}
+
+span[role='button'][aria-grabbed]:not([onclick*='dragsource']):not(
+    [onkeydown*='dragsource']
+  ):not([ondragstart*='dragstart']) {
+  cursor: default !important;
+}
+
+/* Direct content never paints a second background layer. */
+:root span[role='button'][aria-grabbed] > *,
+:root span[role='button'][onclick*='dragtarget'] > *,
+:root span[role='button'][onkeydown*='dragtarget'] > *,
+:root span[role='button'][ondragover*='dragenter'] > *,
+:root p.lia-paragraph > span:not([role])[style*='position: relative'][style*='border: 3px dotted'][style*='vertical-align: middle'] > * {
+  border-radius: inherit !important;
+  background-color: transparent !important;
+  color: inherit;
+}
+
+/* The direct non-draggable child is LiaScript's empty-target plus sign. */
+:root span[role='button'][onclick*='dragtarget'] > :not([draggable='true']),
+:root span[role='button'][onkeydown*='dragtarget'] > :not([draggable='true']),
+:root span[role='button'][ondragover*='dragenter'] > :not([draggable='true']) {
+  color: var(--lia-kachel-accent) !important;
+}
+
+/* A source placed in a target is target content, not a second tile. The
+ * nested draggable intentionally has no role or aria-grabbed attribute. */
+:root span[role='button'][onclick*='dragtarget'] > [draggable='true'],
+:root span[role='button'][onkeydown*='dragtarget'] > [draggable='true'],
+:root span[role='button'][ondragover*='dragenter'] > [draggable='true'] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+:root span[role='button'][onclick*='dragtarget'] > [draggable='true'] > *,
+:root span[role='button'][onkeydown*='dragtarget'] > [draggable='true'] > *,
+:root span[role='button'][ondragover*='dragenter'] > [draggable='true'] > * {
+  max-width: 100%;
+  border-radius: inherit !important;
+  background-color: transparent !important;
+  color: inherit;
+}
+
+/* aria-grabbed=true is intentionally not styled. LiaScript applies that state
+ * to every option belonging to the selected target. Highlighting it would
+ * reveal which source tiles belong to that target before the learner answers. */
+
+span[data-lia-kachelfolge] {
+  display: none !important;
+}
+
+/*
+ * Progressive @KachelfolgeN targets
+ *
+ * All targets stay native LiaScript elements. CSS hides every interactive
+ * target after the progressive marker; the immediately following first target
+ * remains visible even before JavaScript's initial synchronous refresh.
+ */
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onclick*='dragtarget'],
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onkeydown*='dragtarget'],
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][ondragover*='dragenter'] {
+  display: none !important;
+}
+
+span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][onclick*='dragtarget'],
+span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][onkeydown*='dragtarget'],
+span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][ondragover*='dragenter'],
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onclick*='dragtarget'][data-lia-kachelfolge-visible='true'],
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onkeydown*='dragtarget'][data-lia-kachelfolge-visible='true'],
+span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][ondragover*='dragenter'][data-lia-kachelfolge-visible='true'] {
+  display: inline-flex !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root span[role='button'][aria-grabbed],
+  :root span[role='button'][onclick*='dragtarget'],
+  :root span[role='button'][onkeydown*='dragtarget'],
+  :root span[role='button'][ondragover*='dragenter'],
+  :root p.lia-paragraph > span:not([role])[style*='position: relative'][style*='border: 3px dotted'][style*='vertical-align: middle'] {
+    transition: none !important;
+  }
+}
+
+/*
+ * Touch and pen drag adapter
+ *
+ * Single-finger panning is disabled only when a gesture starts on an
+ * interactive source. Pinch zoom and page scrolling remain available from all
+ * other content; mouse drag and LiaScript's keyboard controls stay untouched.
+ */
+:root span[role='button'][aria-grabbed][draggable='true'][ondragstart*='dragstart'][ondragend*='dragend'],
+:root span[role='button'][onclick*='dragtarget'][ondragover*='dragenter'] > [draggable='true'][ondragend*='dragend'] {
+  touch-action: none !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html.lia-kachel-touch-dragging {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.lia-kachel-touch-source-active {
+  opacity: 0.48 !important;
+  cursor: grabbing !important;
+}
+
+.lia-kachel-touch-target-active {
+  box-shadow:
+    0 0 0 3px var(--lia-kachel-accent),
+    0 0 0 6px rgba(var(--color-highlight, 20, 115, 117), 0.18) !important;
+}
+
+.lia-kachel-touch-ghost {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  inset: 0 auto auto 0 !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  max-width: calc(100vw - 16px) !important;
+  margin: 0 !important;
+  padding: 0.65rem 0.8rem !important;
+  border: 3px dotted rgb(var(--lia-grey, 136, 136, 136)) !important;
+  border-radius: var(--lia-kachel-radius) !important;
+  background-color:
+    var(--lia-kachel-ghost-background, var(--lia-kachel-background)) !important;
+  box-shadow: 0 0.45rem 1.15rem rgba(0, 0, 0, 0.24) !important;
+  color: var(--lia-kachel-ghost-color, inherit) !important;
+  opacity: 0.94 !important;
+  pointer-events: none !important;
+  cursor: grabbing !important;
+  transition: none !important;
+  overflow-wrap: anywhere;
+  will-change: transform;
+}
+
+.lia-kachel-touch-ghost * {
+  max-width: 100%;
+  background-color: transparent !important;
+  color: inherit !important;
+  pointer-events: none !important;
+}
+
+@media (forced-colors: active) {
+  .lia-kachel-touch-source-active {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+
+  .lia-kachel-touch-target-active {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+  }
+
+  .lia-kachel-touch-ghost {
+    border-color: CanvasText !important;
+    box-shadow: none !important;
+  }
+}

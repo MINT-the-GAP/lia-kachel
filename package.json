@@ -1,12 +1,31 @@
 {
   "name": "lia-kachel",
-  "version": "0.0.1",
-  "description": "LiaScript Kachel plugin — drag-and-drop tile quizzes with touch support, cross-root drop emulation, and quiz freeze",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Native LiaScript tile styling, touch drag-and-drop, order-independent sequences and automatic content grading in .Kachel regions",
+  "app": "dist/index.js",
   "scripts": {
-    "build": "parcel build src/index.ts --dist-dir dist --no-scope-hoist"
+    "typecheck": "tsc --noEmit",
+    "build": "parcel build src/index.ts --target app --no-scope-hoist",
+    "test": "node --test",
+    "verify": "npm run typecheck && npm run build && npm test"
+  },
+  "targets": {
+    "app": {
+      "context": "browser",
+      "engines": {
+        "browsers": [
+          "defaults",
+          "Safari >= 12",
+          "iOS >= 12"
+        ]
+      },
+      "outputFormat": "global",
+      "sourceMap": false
+    }
   },
   "devDependencies": {
-    "parcel": "^2.16.4",
-    "typescript": "^5.4.0"
+    "parcel": "2.16.4",
+    "typescript": "5.9.3"
   }
 }

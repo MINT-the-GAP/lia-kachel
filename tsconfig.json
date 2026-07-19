@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2018",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": false,
-    "allowJs": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "outDir": "dist",
-    "skipLibCheck": true
+    "moduleResolution": "Bundler",
+    "lib": ["ES2018", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"]
+  "include": ["src/**/*.ts"]
 }
