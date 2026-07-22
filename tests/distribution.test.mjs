@@ -39,6 +39,13 @@ async function authoredTemplateFiles() {
 }
 
 function runtimeWithoutObservers(registrations) {
+  const styleNodes = new Map()
+  const styleHost = {
+    appendChild(node) {
+      styleNodes.set(node.id, node)
+      return node
+    },
+  }
   const windowStub = {
     PointerEvent: function PointerEvent() {},
     addEventListener(type, listener, options) {
@@ -52,6 +59,8 @@ function runtimeWithoutObservers(registrations) {
   }
   const documentStub = {
     defaultView: windowStub,
+    documentElement: styleHost,
+    head: styleHost,
     visibilityState: 'visible',
     addEventListener(type, listener, options) {
       registrations.push(['document', type, listener, options])
@@ -60,10 +69,27 @@ function runtimeWithoutObservers(registrations) {
     querySelectorAll() {
       return []
     },
+    createElement(tagName) {
+      assert.equal(tagName, 'style')
+      const attributes = new Map()
+      return {
+        id: '',
+        textContent: '',
+        setAttribute(name, value) {
+          attributes.set(name, String(value))
+        },
+        getAttribute(name) {
+          return attributes.get(name) ?? null
+        },
+      }
+    },
+    getElementById(id) {
+      return styleNodes.get(id) ?? null
+    },
   }
   windowStub.document = documentStub
 
-  return { documentStub, windowStub }
+  return { documentStub, styleNodes, windowStub }
 }
 
 test('the LiaScript template references relative assets and documents the literal region syntax', async () => {
@@ -72,7 +98,7 @@ test('the LiaScript template references relative assets and documents the litera
   const bundle = await readFile(fromProject('dist/index.js'), 'utf8')
 
   assert.match(readme, /^script:\s*\.\/dist\/index\.js\s*$/m)
-  assert.match(readme, /^link:\s*\.\/styles\.css\s*$/m)
+  assert.doesNotMatch(readme, /^link:/m)
   assert.match(readme, /^@Kachelfolge:\s*@Kachelfolge_\(@uid,`@0`\)\s*$/m)
   assert.match(
     readme,
@@ -92,12 +118,30 @@ test('the LiaScript template references relative assets and documents the litera
     'the newest user example must be copyable without a macro or script',
   )
   assert.match(readme, /data-lia-kachelfolge-mode="progressive"/)
+  assert.match(
+    readme,
+    /<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0">\s*@1\s*<\/div>/,
+  )
+  assert.match(
+    readme,
+    /<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive">\s*@1\s*<\/div>/,
+  )
   assert.doesNotMatch(readme, /<script\s+modify=.*kachelfolge/i)
   assert.ok(stylesheet.length > 0)
   assert.doesNotMatch(stylesheet, /\[aria-grabbed='true'\]/)
   assert.doesNotMatch(stylesheet, /:(?:where|has)\(/)
   assert.match(stylesheet, /data-lia-kachelfolge-visible='true'/)
+  assert.match(
+    stylesheet,
+    /\[data-lia-kachelfolge-mode='progressive'\]\s+span/,
+  )
+  assert.doesNotMatch(
+    stylesheet,
+    /\[data-lia-kachelfolge-mode='progressive'\]\s*[~+]/,
+  )
   assert.ok(bundle.length > 0)
+  assert.match(bundle, /lia-kachel-styles/)
+  assert.match(bundle, /--lia-kachel-radius/)
   assert.doesNotMatch(bundle, /\?\?/)
   assert.doesNotMatch(bundle, /\?\.[A-Za-z[(]/)
 })
@@ -228,7 +272,7 @@ test('the content fixture imports native quizzes and multiple tracks inside div.
 test('the generated bundle is classic JavaScript, exposes content helpers and installs once', async () => {
   const bundle = await readFile(fromProject('dist/index.js'), 'utf8')
   const registrations = []
-  const { documentStub, windowStub } =
+  const { documentStub, styleNodes, windowStub } =
     runtimeWithoutObservers(registrations)
   const context = vm.createContext({
     console,
@@ -243,6 +287,14 @@ test('the generated bundle is classic JavaScript, exposes content helpers and in
 
   assert.ok(registrationCount > 0)
   assert.equal(registrations.length, registrationCount)
+  assert.equal(styleNodes.size, 1)
+  const installedStyles = styleNodes.get('lia-kachel-styles')
+  assert.ok(installedStyles)
+  assert.equal(installedStyles.getAttribute('data-lia-kachel-styles'), '')
+  assert.match(
+    installedStyles.textContent,
+    /data-lia-kachelfolge-mode=progressive/,
+  )
   assert.ok(
     registrations.some(
       ([target, type]) => target === 'document' && type === 'pointerdown',
@@ -267,36 +319,92 @@ test('the generated bundle is classic JavaScript, exposes content helpers and in
   assert.equal(windowStub.LiaKachel['kachel' + 'n'], undefined)
 })
 
-test('progressive and content observers install once and batch local mutations', async () => {
+test('late imported progressive roots reveal N+1 while observers stay local', async () => {
   const bundle = await readFile(fromProject('dist/index.js'), 'utf8')
   const observers = []
   const frames = []
   const selectors = []
-  let paragraphQueryCount = 0
+  let progressiveQueryCount = 0
   let regionQueryCount = 0
   let marker
-  const paragraph = {
-    querySelectorAll(selector) {
-      paragraphQueryCount += 1
-      return selector.includes('data-lia-kachelfolge-mode') ? [marker] : []
-    },
+  const progressiveRootSelector =
+    "[data-lia-kachelfolge-mode='progressive']"
+  const nativeTargetSelector =
+    "span[role='button'][ondragover*='dragenter']"
+  const track = '[["quiz",91],["input",0]]'
+  const nativeHandler = (command, address = null) => {
+    const value = address
+      ? `, value: [${String(address[0])},${String(address[1])}]`
+      : ''
+    return `window.LIA.send({ track: ${track}, message: { cmd: '${command}', param: { id: 0${value} } } })`
   }
+
+  const progressiveTarget = () => {
+    const attributes = new Map([
+      ['ondragover', nativeHandler('dragenter')],
+    ])
+
+    return {
+      nodeType: 1,
+      isConnected: true,
+      children: [],
+      closest(selector) {
+        return selector === progressiveRootSelector ? marker : null
+      },
+      matches() {
+        return false
+      },
+      querySelectorAll() {
+        return []
+      },
+      getAttribute(name) {
+        return attributes.get(name) ?? null
+      },
+      setAttribute(name, value) {
+        attributes.set(name, String(value))
+      },
+      removeAttribute(name) {
+        attributes.delete(name)
+      },
+      setAddress(address) {
+        this.children.length = 0
+        if (!address) return
+
+        this.children.push({
+          getAttribute(name) {
+            if (name === 'draggable') return 'true'
+            if (name === 'ondragend') {
+              return nativeHandler('dragend', address)
+            }
+            return null
+          },
+        })
+      },
+    }
+  }
+  const progressiveTargets = [
+    progressiveTarget(),
+    progressiveTarget(),
+    progressiveTarget(),
+  ]
   marker = {
+    nodeType: 1,
     isConnected: true,
-    closest() {
-      return paragraph
+    closest(selector) {
+      return selector === progressiveRootSelector ? this : null
     },
-    matches() {
-      return true
+    matches(selector) {
+      return selector === progressiveRootSelector
     },
-    querySelectorAll() {
-      return []
+    querySelectorAll(selector) {
+      progressiveQueryCount += 1
+      return selector === nativeTargetSelector ? progressiveTargets : []
     },
   }
   const progressiveMutationTarget = {
     nodeType: 1,
     closest() {
-      return paragraph
+      return null
     },
     matches() {
       return false
@@ -379,16 +487,44 @@ test('progressive and content observers install once and batch local mutations',
   assert.ok(selectors.includes('div.Kachel'))
 
   const [progressiveObserver, contentObserver] = observers
-  const progressiveMutation = {
-    addedNodes: [],
+  const importedRootMutation = {
+    addedNodes: [marker],
     target: progressiveMutationTarget,
   }
-  progressiveObserver.callback([progressiveMutation])
-  progressiveObserver.callback([progressiveMutation])
+  const visibleTargets = () =>
+    progressiveTargets.map(
+      (target) =>
+        target.getAttribute('data-lia-kachelfolge-visible') === 'true',
+    )
+
+  progressiveObserver.callback([importedRootMutation])
+  progressiveObserver.callback([importedRootMutation])
   assert.equal(frames.length, 1)
 
   frames.shift()(0)
-  assert.ok(paragraphQueryCount > 0)
+  assert.deepEqual(visibleTargets(), [true, false, false])
+
+  progressiveTargets[0].setAddress([0, 0])
+  const firstPlacement = {
+    addedNodes: [],
+    target: progressiveTargets[0],
+  }
+  progressiveObserver.callback([firstPlacement])
+  progressiveObserver.callback([firstPlacement])
+  assert.equal(frames.length, 1)
+
+  frames.shift()(0)
+  assert.deepEqual(visibleTargets(), [true, true, false])
+
+  progressiveTargets[1].setAddress([1, 0])
+  progressiveObserver.callback([
+    { addedNodes: [], target: progressiveTargets[1] },
+  ])
+  assert.equal(frames.length, 1)
+
+  frames.shift()(0)
+  assert.deepEqual(visibleTargets(), [true, true, true])
+  assert.ok(progressiveQueryCount > 0)
 
   const globalQueriesBeforeRegionMutation = selectors.length
   const regionMutation = { addedNodes: [], target: region }

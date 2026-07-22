@@ -4,6 +4,10 @@ import test from 'node:test'
 import vm from 'node:vm'
 
 const projectRoot = new URL('../', import.meta.url)
+const nativeTargetSelector =
+  "span[role='button'][ondragover*='dragenter']"
+const progressiveRootSelector =
+  "[data-lia-kachelfolge-mode='progressive']"
 
 async function loadKachelfolgeApi() {
   const bundle = await readFile(new URL('dist/index.js', projectRoot), 'utf8')
@@ -78,20 +82,16 @@ function targetStub(track, address) {
 function documentStub(uid, addresses, quizId = 0) {
   const track = nativeTrack(quizId)
   const targets = addresses.map((address) => targetStub(track, address))
-  const paragraph = {
-    querySelectorAll() {
+  const root = {
+    querySelectorAll(selector) {
+      assert.equal(selector, nativeTargetSelector)
       return targets
-    },
-  }
-  const marker = {
-    closest(selector) {
-      return selector === 'p' ? paragraph : null
     },
   }
 
   return {
     getElementById(id) {
-      return id === `lia-kachelfolge-${uid}` ? marker : null
+      return id === `lia-kachelfolge-${uid}` ? root : null
     },
   }
 }
@@ -99,21 +99,16 @@ function documentStub(uid, addresses, quizId = 0) {
 function progressiveDocumentStub(addresses, quizId = 0) {
   const track = nativeTrack(quizId)
   const targets = addresses.map((address) => targetStub(track, address))
-  const paragraph = {
-    querySelectorAll() {
+  const root = {
+    querySelectorAll(selector) {
+      assert.equal(selector, nativeTargetSelector)
       return targets
-    },
-  }
-  const marker = {
-    closest(selector) {
-      return selector === 'p' ? paragraph : null
     },
   }
   const ownerDocument = {
     querySelectorAll(selector) {
-      return selector.includes('data-lia-kachelfolge-mode')
-        ? [marker]
-        : []
+      assert.equal(selector, progressiveRootSelector)
+      return [root]
     },
   }
 

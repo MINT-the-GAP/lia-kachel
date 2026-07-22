@@ -143,29 +143,22 @@ span[role='button'][aria-grabbed]:not([onclick*='dragsource']):not(
  * to every option belonging to the selected target. Highlighting it would
  * reveal which source tiles belong to that target before the learner answers. */
 
-span[data-lia-kachelfolge] {
-  display: none !important;
-}
-
 /*
  * Progressive @KachelfolgeN targets
  *
- * All targets stay native LiaScript elements. CSS hides every interactive
- * target after the progressive marker; the immediately following first target
- * remains visible even before JavaScript's initial synchronous refresh.
+ * All targets stay native LiaScript elements inside one stable macro root.
+ * CSS starts with every target hidden; JavaScript exposes the first target and
+ * then exactly one further empty target after each native placement update.
  */
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onclick*='dragtarget'],
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onkeydown*='dragtarget'],
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][ondragover*='dragenter'] {
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][onclick*='dragtarget'],
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][onkeydown*='dragtarget'],
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][ondragover*='dragenter'] {
   display: none !important;
 }
 
-span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][onclick*='dragtarget'],
-span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][onkeydown*='dragtarget'],
-span[data-lia-kachelfolge-mode='progressive'] + span[role='button'][ondragover*='dragenter'],
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onclick*='dragtarget'][data-lia-kachelfolge-visible='true'],
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][onkeydown*='dragtarget'][data-lia-kachelfolge-visible='true'],
-span[data-lia-kachelfolge-mode='progressive'] ~ span[role='button'][ondragover*='dragenter'][data-lia-kachelfolge-visible='true'] {
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][onclick*='dragtarget'][data-lia-kachelfolge-visible='true'],
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][onkeydown*='dragtarget'][data-lia-kachelfolge-visible='true'],
+[data-lia-kachelfolge-mode='progressive'] span[role='button'][ondragover*='dragenter'][data-lia-kachelfolge-visible='true'] {
   display: inline-flex !important;
 }
 

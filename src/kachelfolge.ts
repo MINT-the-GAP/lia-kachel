@@ -235,19 +235,18 @@ export function checkKachelfolge(
     return reportAuthoringProblem(uid, error)
   }
 
-  const marker = ownerDocument.getElementById(`lia-kachelfolge-${uid}`)
-  const paragraph = marker?.closest('p') ?? null
+  const root = ownerDocument.getElementById(`lia-kachelfolge-${uid}`)
 
-  if (!marker || !paragraph) {
-    return reportContractProblem(uid, 'Der Inline-Marker wurde nicht gefunden.')
+  if (!root) {
+    return reportContractProblem(uid, 'Der Makro-Wrapper wurde nicht gefunden.')
   }
 
   // @input currently serializes every placed Multi-Drop source as -1. The
   // native [origin target, option] address therefore has to be read from the
-  // rendered handler. Keeping the marker and all targets in one paragraph is
-  // an explicit part of the macro contract and avoids any global DOM lookup.
+  // rendered handler. Keeping all targets inside one macro root is an explicit
+  // part of the import contract and avoids any global DOM lookup.
   const targets = Array.from(
-    paragraph.querySelectorAll<HTMLElement>(TARGET_SELECTOR),
+    root.querySelectorAll<HTMLElement>(TARGET_SELECTOR),
   )
 
   if (targets.length !== expected.length) {

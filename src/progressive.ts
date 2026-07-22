@@ -2,7 +2,7 @@ import { TARGET_SELECTOR } from './dom'
 import { placedSourceAddress } from './kachelfolge'
 
 export const PROGRESSIVE_MARKER_SELECTOR =
-  "span[data-lia-kachelfolge-mode='progressive']"
+  "[data-lia-kachelfolge-mode='progressive']"
 export const PROGRESSIVE_VISIBLE_ATTRIBUTE =
   'data-lia-kachelfolge-visible'
 
@@ -31,11 +31,8 @@ export function progressiveVisibleCount(
 }
 
 export function refreshProgressiveMarker(marker: Element): number {
-  const paragraph = marker.closest('p')
-  if (!paragraph) return 0
-
   const targets = Array.from(
-    paragraph.querySelectorAll<HTMLElement>(TARGET_SELECTOR),
+    marker.querySelectorAll<HTMLElement>(TARGET_SELECTOR),
   )
   const filledTargets = targets.map(
     (target) => placedSourceAddress(target) !== null,
@@ -65,16 +62,14 @@ function collectProgressiveMarkers(
 
   if (element.matches(PROGRESSIVE_MARKER_SELECTOR)) markers.add(element)
 
+  const containingMarker = element.closest(PROGRESSIVE_MARKER_SELECTOR)
+  if (containingMarker) markers.add(containingMarker)
+
   if (includeDescendants) {
     element
       .querySelectorAll(PROGRESSIVE_MARKER_SELECTOR)
       .forEach((marker) => markers.add(marker))
   }
-
-  element
-    .closest('p')
-    ?.querySelectorAll(PROGRESSIVE_MARKER_SELECTOR)
-    .forEach((marker) => markers.add(marker))
 }
 
 export function refreshProgressiveKachelfolgen(

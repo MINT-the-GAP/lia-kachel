@@ -1,5 +1,5 @@
 export const TARGET_SELECTOR =
-  "span[role='button'][onclick*='dragtarget'][ondragover*='dragenter']"
+  "span[role='button'][ondragover*='dragenter']"
 
 export const BANK_SOURCE_SELECTOR =
   "span[role='button'][aria-grabbed][draggable='true'][ondragstart*='dragstart'][ondragend*='dragend']"

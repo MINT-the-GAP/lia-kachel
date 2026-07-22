@@ -7,14 +7,15 @@ comment:    Native LiaScript-Kacheln mit Touch-Drag-and-Drop, Kachelfolgen und a
 repository: https://github.com/MINT-the-GAP/lia-kachel
 
 script: ./dist/index.js
-link: ./styles.css
 
 @Kachelfolge: @Kachelfolge_(@uid,`@0`)
 
 @KachelfolgeN: @KachelfolgeN_(@uid,`@0`)
 
 @Kachelfolge_
-<span hidden aria-hidden="true" id="lia-kachelfolge-@0" data-lia-kachelfolge="@0"></span>@1
+<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0">
+@1
+</div>
 <script>
 window.LiaKachel.kachelfolge.check("@0", "@'1")
 </script>
@@ -22,7 +23,9 @@ window.LiaKachel.kachelfolge.check("@0", "@'1")
 @end
 
 @KachelfolgeN_
-<span hidden aria-hidden="true" id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive"></span>@1
+<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive">
+@1
+</div>
 <script>
 window.LiaKachel.kachelfolge.check("@0", "@'1")
 </script>
@@ -35,8 +38,10 @@ window.LiaKachel.kachelfolge.check("@0", "@'1")
 
 Das Template hat drei klar getrennte Schichten:
 
-- styles.css gestaltet alle nativen Quell-, Ziel-, belegten und aufgelösten
-  LiaScript-Kacheln.
+- styles.css ist die einzige Quelle für die Gestaltung aller nativen Quell-,
+  Ziel-, belegten und aufgelösten LiaScript-Kacheln. Beim Build wird sie in
+  dist/index.js eingebettet, damit ein Import kein externes CSS mit falschem
+  MIME-Typ laden muss.
 - src/ enthält die wartbare TypeScript-Quelle für Touch, Stift,
   reihenfolgeunabhängige Auswertung, progressive Zielanzeige und die
   automatische Inhaltsprüfung in `.Kachel`-Regionen.
@@ -250,8 +255,10 @@ src/
   content.ts   zielweise Prüfung gerenderter Kachelinhalte
   kachelfolge.ts Parser und nativer, reihenfolgeunabhängiger Validator
   progressive.ts schrittweise Anzeige nativer Targets
+  styles.ts    einmalige Installation der eingebetteten styles.css
   touch.ts     Gestenzustand, Ghost, Abbruch und Auto-Scroll
   index.ts     einmalige Installation
+styles.css     gemeinsame, beim Build eingebettete CSS-Quelle
 dist/
   index.js     generierte JavaScript-Ausgabe
 tests/

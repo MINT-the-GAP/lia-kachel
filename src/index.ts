@@ -17,6 +17,7 @@ import {
   progressiveVisibleCount,
   refreshProgressiveKachelfolgen,
 } from './progressive'
+import { installKachelStyles } from './styles'
 import { installTouchDragAndDrop } from './touch'
 
 const TOUCH_INSTALLATION_KEY = Symbol.for(
@@ -30,6 +31,8 @@ const CONTENT_INSTALLATION_KEY = Symbol.for(
 )
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  installKachelStyles(document)
+
   const runtime = window as unknown as Record<PropertyKey, unknown>
   const existingApi =
     runtime.LiaKachel && typeof runtime.LiaKachel === 'object'
