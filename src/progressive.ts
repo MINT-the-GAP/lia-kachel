@@ -5,6 +5,8 @@ export const PROGRESSIVE_MARKER_SELECTOR =
   "[data-lia-kachelfolge-mode='progressive']"
 export const PROGRESSIVE_VISIBLE_ATTRIBUTE =
   'data-lia-kachelfolge-visible'
+export const PROGRESSIVE_DUMMY_SELECTOR =
+  "[data-lia-kachelfolge-dummy='true']"
 
 /**
  * Keeps exactly one empty target available without disclosing the total target
@@ -24,10 +26,17 @@ export function progressiveVisibility(
   })
 }
 
+/** Counts visible native targets plus the final inert N+1 field. */
 export function progressiveVisibleCount(
   filledTargets: readonly boolean[],
 ): number {
-  return progressiveVisibility(filledTargets).filter(Boolean).length
+  const nativeVisibleCount = progressiveVisibility(filledTargets).filter(
+    Boolean,
+  ).length
+  const dummyVisible =
+    filledTargets.length > 0 && filledTargets.every(Boolean)
+
+  return nativeVisibleCount + (dummyVisible ? 1 : 0)
 }
 
 export function refreshProgressiveMarker(marker: Element): number {
@@ -38,6 +47,7 @@ export function refreshProgressiveMarker(marker: Element): number {
     (target) => placedSourceAddress(target) !== null,
   )
   const visibleTargets = progressiveVisibility(filledTargets)
+  const dummy = marker.querySelector<HTMLElement>(PROGRESSIVE_DUMMY_SELECTOR)
 
   targets.forEach((target, index) => {
     if (visibleTargets[index]) {
@@ -47,7 +57,18 @@ export function refreshProgressiveMarker(marker: Element): number {
     }
   })
 
-  return visibleTargets.filter(Boolean).length
+  const dummyVisible =
+    dummy !== null && targets.length > 0 && filledTargets.every(Boolean)
+
+  if (dummy) {
+    if (dummyVisible) {
+      dummy.setAttribute(PROGRESSIVE_VISIBLE_ATTRIBUTE, 'true')
+    } else {
+      dummy.removeAttribute(PROGRESSIVE_VISIBLE_ATTRIBUTE)
+    }
+  }
+
+  return visibleTargets.filter(Boolean).length + (dummyVisible ? 1 : 0)
 }
 
 function collectProgressiveMarkers(

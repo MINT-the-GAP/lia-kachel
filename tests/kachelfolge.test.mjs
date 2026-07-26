@@ -8,6 +8,8 @@ const nativeTargetSelector =
   "span[role='button'][ondragover*='dragenter']"
 const progressiveRootSelector =
   "[data-lia-kachelfolge-mode='progressive']"
+const progressiveDummySelector =
+  "[data-lia-kachelfolge-dummy='true']"
 
 async function loadKachelfolgeApi() {
   const bundle = await readFile(new URL('dist/index.js', projectRoot), 'utf8')
@@ -99,10 +101,26 @@ function documentStub(uid, addresses, quizId = 0) {
 function progressiveDocumentStub(addresses, quizId = 0) {
   const track = nativeTrack(quizId)
   const targets = addresses.map((address) => targetStub(track, address))
+  const dummyAttributes = new Map()
+  const dummy = {
+    getAttribute(name) {
+      return dummyAttributes.get(name) ?? null
+    },
+    setAttribute(name, value) {
+      dummyAttributes.set(name, String(value))
+    },
+    removeAttribute(name) {
+      dummyAttributes.delete(name)
+    },
+  }
   const root = {
     querySelectorAll(selector) {
       assert.equal(selector, nativeTargetSelector)
       return targets
+    },
+    querySelector(selector) {
+      assert.equal(selector, progressiveDummySelector)
+      return dummy
     },
   }
   const ownerDocument = {
@@ -112,7 +130,7 @@ function progressiveDocumentStub(addresses, quizId = 0) {
     },
   }
 
-  return { ownerDocument, targets }
+  return { dummy, ownerDocument, targets }
 }
 
 function permutations(values) {
@@ -241,7 +259,7 @@ test('progressive target counts reveal one empty slot without leaking gaps', asy
   assert.equal(api.progressiveVisibleCount([false, false, false]), 1)
   assert.equal(api.progressiveVisibleCount([true, false, false]), 2)
   assert.equal(api.progressiveVisibleCount([true, true, false]), 3)
-  assert.equal(api.progressiveVisibleCount([true, true, true]), 3)
+  assert.equal(api.progressiveVisibleCount([true, true, true]), 4)
   assert.equal(api.progressiveVisibleCount([false, true, false]), 2)
   assert.equal(api.progressiveVisibleCount([false, false, true, false]), 2)
   assert.equal(
@@ -252,7 +270,7 @@ test('progressive target counts reveal one empty slot without leaking gaps', asy
 
 test('progressive refresh reacts to place, move and remove on native targets', async () => {
   const api = await loadKachelfolgeApi()
-  const { ownerDocument, targets } = progressiveDocumentStub(
+  const { dummy, ownerDocument, targets } = progressiveDocumentStub(
     [null, null, null, null],
     23,
   )
@@ -264,6 +282,7 @@ test('progressive refresh reacts to place, move and remove on native targets', a
 
   api.refreshProgressive(ownerDocument)
   assert.deepEqual(visible(), [true, false, false, false])
+  assert.equal(dummy.getAttribute('data-lia-kachelfolge-visible'), null)
 
   targets[0].setAddress([3, 1])
   api.refreshProgressive(ownerDocument)
@@ -298,6 +317,34 @@ test('progressive refresh reacts to place, move and remove on native targets', a
     [true, false, false, true],
     'a restored high-index tile stays visible beside exactly one empty target',
   )
+
+  targets.forEach((target, index) => target.setAddress([index, 0]))
+  api.refreshProgressive(ownerDocument)
+  assert.deepEqual(visible(), [true, true, true, true])
+  assert.equal(dummy.getAttribute('data-lia-kachelfolge-visible'), 'true')
+
+  targets[2].setAddress(null)
+  api.refreshProgressive(ownerDocument)
+  assert.equal(dummy.getAttribute('data-lia-kachelfolge-visible'), null)
+})
+
+test('the screenshot quiz exposes one inert N+1 field after all native targets are filled', async () => {
+  const api = await loadKachelfolgeApi()
+  const { dummy, ownerDocument, targets } = progressiveDocumentStub(
+    [[0, 0], [1, 0], [2, 0]],
+    24,
+  )
+
+  api.refreshProgressive(ownerDocument)
+
+  assert.deepEqual(
+    targets.map(
+      (target) =>
+        target.getAttribute('data-lia-kachelfolge-visible') === 'true',
+    ),
+    [true, true, true],
+  )
+  assert.equal(dummy.getAttribute('data-lia-kachelfolge-visible'), 'true')
 })
 
 test('progressive counts support arbitrary N without shared state', async () => {
@@ -313,6 +360,6 @@ test('progressive counts support arbitrary N without shared state', async () => 
     filled[index] = true
   }
 
-  assert.equal(api.progressiveVisibleCount(filled), count)
+  assert.equal(api.progressiveVisibleCount(filled), count + 1)
   assert.equal(api.progressiveVisibleCount([false, false]), 1)
 })

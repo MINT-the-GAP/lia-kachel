@@ -32,6 +32,11 @@ Quiz N-B:
 <!-- data-randomize="true" -->
 @KachelfolgeN(`[->[falsch|(einzig)]]`)
 
+## N+1-Regression aus dem Online-Import
+
+<!-- data-randomize="true" -->
+@KachelfolgeN(`[->[(Karmesin)]][->[(Scharlach)]][->[(Rubinrot)|Kobalt]]`)
+
 ## Zwölf Targets
 
 <!-- data-randomize="true" -->

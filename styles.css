@@ -162,6 +162,31 @@ span[role='button'][aria-grabbed]:not([onclick*='dragsource']):not(
   display: inline-flex !important;
 }
 
+/* Stable, inert N+1 sentinel. It is authored by the macro so LiaScript owns
+ * its DOM node even when an imported quiz is rendered or replaced late. */
+[data-lia-kachelfolge-mode='progressive'] [data-lia-kachelfolge-dummy='true'] {
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-width: var(--lia-kachel-target-min-width) !important;
+  min-height: var(--lia-kachel-min-height) !important;
+  max-width: 100% !important;
+  margin: 0.25rem !important;
+  padding: 1rem 0.52rem !important;
+  border: 3px dotted rgb(var(--lia-grey, 136, 136, 136)) !important;
+  border-radius: var(--lia-kachel-radius) !important;
+  background-color: var(--lia-kachel-background) !important;
+  color: var(--lia-kachel-accent) !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  pointer-events: none !important;
+}
+
+[data-lia-kachelfolge-mode='progressive'] [data-lia-kachelfolge-dummy='true'][data-lia-kachelfolge-visible='true'] {
+  display: inline-flex !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root span[role='button'][aria-grabbed],
   :root span[role='button'][onclick*='dragtarget'],

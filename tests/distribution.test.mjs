@@ -124,13 +124,14 @@ test('the LiaScript template references relative assets and documents the litera
   )
   assert.match(
     readme,
-    /<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive">\s*@1\s*<\/div>/,
+    /<div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive">\s*@1<span data-lia-kachelfolge-dummy="true" aria-hidden="true" inert>✛<\/span>\s*<\/div>/,
   )
   assert.doesNotMatch(readme, /<script\s+modify=.*kachelfolge/i)
   assert.ok(stylesheet.length > 0)
   assert.doesNotMatch(stylesheet, /\[aria-grabbed='true'\]/)
   assert.doesNotMatch(stylesheet, /:(?:where|has)\(/)
   assert.match(stylesheet, /data-lia-kachelfolge-visible='true'/)
+  assert.match(stylesheet, /data-lia-kachelfolge-dummy='true'/)
   assert.match(
     stylesheet,
     /\[data-lia-kachelfolge-mode='progressive'\]\s+span/,
@@ -231,7 +232,11 @@ test('the progressive fixture imports arbitrary and adjacent @KachelfolgeN macro
 
   assert.ok(importPath)
   assert.equal(new URL(importPath, fixtureUrl).href, fromProject('README.md').href)
-  assert.deepEqual(targetCounts, [4, 3, 2, 2, 1, 12])
+  assert.deepEqual(targetCounts, [4, 3, 2, 2, 1, 3, 12])
+  assert.match(
+    fixture,
+    /@KachelfolgeN\(`\[->\[\(Karmesin\)\]\]\[->\[\(Scharlach\)\]\]\[->\[\(Rubinrot\)\|Kobalt\]\]`\)/,
+  )
 })
 
 test('the content fixture imports native quizzes and multiple tracks inside div.Kachel regions', async () => {
@@ -329,6 +334,8 @@ test('late imported progressive roots reveal N+1 while observers stay local', as
   let marker
   const progressiveRootSelector =
     "[data-lia-kachelfolge-mode='progressive']"
+  const progressiveDummySelector =
+    "[data-lia-kachelfolge-dummy='true']"
   const nativeTargetSelector =
     "span[role='button'][ondragover*='dragenter']"
   const track = '[["quiz",91],["input",0]]'
@@ -387,6 +394,18 @@ test('late imported progressive roots reveal N+1 while observers stay local', as
     progressiveTarget(),
     progressiveTarget(),
   ]
+  const progressiveDummyAttributes = new Map()
+  const progressiveDummy = {
+    getAttribute(name) {
+      return progressiveDummyAttributes.get(name) ?? null
+    },
+    setAttribute(name, value) {
+      progressiveDummyAttributes.set(name, String(value))
+    },
+    removeAttribute(name) {
+      progressiveDummyAttributes.delete(name)
+    },
+  }
   marker = {
     nodeType: 1,
     isConnected: true,
@@ -399,6 +418,9 @@ test('late imported progressive roots reveal N+1 while observers stay local', as
     querySelectorAll(selector) {
       progressiveQueryCount += 1
       return selector === nativeTargetSelector ? progressiveTargets : []
+    },
+    querySelector(selector) {
+      return selector === progressiveDummySelector ? progressiveDummy : null
     },
   }
   const progressiveMutationTarget = {
@@ -503,6 +525,10 @@ test('late imported progressive roots reveal N+1 while observers stay local', as
 
   frames.shift()(0)
   assert.deepEqual(visibleTargets(), [true, false, false])
+  assert.equal(
+    progressiveDummy.getAttribute('data-lia-kachelfolge-visible'),
+    null,
+  )
 
   progressiveTargets[0].setAddress([0, 0])
   const firstPlacement = {
@@ -524,6 +550,23 @@ test('late imported progressive roots reveal N+1 while observers stay local', as
 
   frames.shift()(0)
   assert.deepEqual(visibleTargets(), [true, true, true])
+  assert.equal(
+    progressiveDummy.getAttribute('data-lia-kachelfolge-visible'),
+    null,
+  )
+
+  progressiveTargets[2].setAddress([2, 0])
+  progressiveObserver.callback([
+    { addedNodes: [], target: progressiveTargets[2] },
+  ])
+  assert.equal(frames.length, 1)
+
+  frames.shift()(0)
+  assert.deepEqual(visibleTargets(), [true, true, true])
+  assert.equal(
+    progressiveDummy.getAttribute('data-lia-kachelfolge-visible'),
+    'true',
+  )
   assert.ok(progressiveQueryCount > 0)
 
   const globalQueriesBeforeRegionMutation = selectors.length

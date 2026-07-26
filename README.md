@@ -24,7 +24,7 @@ window.LiaKachel.kachelfolge.check("@0", "@'1")
 
 @KachelfolgeN_
 <div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0" data-lia-kachelfolge-mode="progressive">
-@1
+@1<span data-lia-kachelfolge-dummy="true" aria-hidden="true" inert>✛</span>
 </div>
 <script>
 window.LiaKachel.kachelfolge.check("@0", "@'1")
@@ -134,22 +134,26 @@ voneinander isoliert.
 `@KachelfolgeN` verwendet dieselbe Syntax und dieselbe
 reihenfolgeunabhängige Identitätsprüfung. Der Unterschied liegt ausschließlich
 in der Anzeige: Zu Beginn ist genau ein natives Target sichtbar. Sobald alle
-aktuell sichtbaren Targets belegt sind, erscheint das nächste. Erst wenn das
-letzte Target belegt wurde und kein weiteres erscheint, ist die Länge für die
-lernende Person erkennbar.
+aktuell sichtbaren Targets belegt sind, erscheint das nächste. Nach dem letzten
+nativen Target erscheint ein zusätzliches, mit `✛` markiertes N+1-Feld. Es ist
+rein visuell, nimmt keine Kachel an und gehört nicht zur Auswertung. Dadurch
+verrät auch die vollständige Belegung nicht vor dem Prüfen, ob die gesuchte
+Menge bereits vollständig ist.
 
 Ob eine eingesetzte Kachel richtig oder falsch ist, spielt für das Aufdecken
-keine Rolle. Beim Verschieben oder Entfernen wird kein zusätzliches Target
-freigeschaltet, und ein bereits belegtes Target wird nie ausgeblendet.
+keine Rolle. Beim Verschieben oder Entfernen wird kein zusätzliches natives
+Target freigeschaltet, und ein bereits belegtes Target wird nie ausgeblendet.
+Das N+1-Feld verschwindet wieder, sobald mindestens ein natives Target leer ist.
 
 <!-- data-randomize="true" -->
 Finde die unbekannt lange Menge und ordne sie beliebig an:
 @KachelfolgeN(`[->[(Kupfer)|Holz]][->[Glas|(Silber)|Stein]][->[(Gold)|Papier]][->[Wasser|(Platin)]]`)
 
-Das Makro erzeugt weiterhin sämtliche Sources und Targets nativ in genau einem
-LiaScript-Quiz. Die noch nicht freigegebenen Targets sind lediglich aus Layout,
-Fokusreihenfolge und Accessibility-Baum ausgeblendet. Es gibt keine
-nachgebauten Targets und keine zweite Auswertungslogik.
+Das Makro erzeugt weiterhin sämtliche bewerteten Sources und Targets nativ in
+genau einem LiaScript-Quiz. Die noch nicht freigegebenen Targets sind lediglich
+aus Layout, Fokusreihenfolge und Accessibility-Baum ausgeblendet. Nur das
+abschließende N+1-Feld ist ein inertes, für assistive Technik ausgeblendetes
+Anzeigeelement; es gibt keine zweite Auswertungslogik.
 
 Damit die richtige Anzahl nicht aus dem Quellenpool herleitbar ist, sollte die
 Aufgabe falsche Optionen enthalten und mit `data-randomize="true"` gemischt
@@ -287,9 +291,9 @@ Das Design kann von einem Kurs über folgende Variablen angepasst werden:
 
 `@Kachelfolge` verändert ausschließlich die Regel, nach der die vorhandenen
 nativen Sources als Gesamtmenge geprüft werden. `@KachelfolgeN` blendet
-zusätzlich die noch nicht erreichten nativen Targets aus. `div.Kachel`
-vergleicht dagegen ausschließlich den sichtbaren Soll- und Istinhalt am
-jeweiligen Target. Die Region wertet weder Aufgabenprosa noch rohe
-Markdown-Quellen heuristisch aus. Es gibt keine zweite
-Drag-and-Drop-Implementierung, keine DOM-Klone und kein manuell nachgebautes
-Quiz-Feedback.
+zusätzlich die noch nicht erreichten nativen Targets aus und zeigt nach ihrer
+vollständigen Belegung ein inertes N+1-Feld. `div.Kachel` vergleicht dagegen
+ausschließlich den sichtbaren Soll- und Istinhalt am jeweiligen Target. Die
+Region wertet weder Aufgabenprosa noch rohe Markdown-Quellen heuristisch aus.
+Es gibt keine zweite Drag-and-Drop-Implementierung, keine DOM-Klone nativer
+Targets und kein manuell nachgebautes Quiz-Feedback.
