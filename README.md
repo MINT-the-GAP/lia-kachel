@@ -1,9 +1,9 @@
 <!--
-author:     Martin Lommatzsch, Jihad Hyadi
-version:    0.0.1
+author:     Martin Lommatzsch; Jihad Hyadi
+version:    1.0.0
 language:   de
 narrator:   Deutsch Female
-comment:    Native LiaScript-Kacheln mit Touch-Drag-and-Drop, Kachelfolgen und automatischer Inhaltsprüfung in .Kachel-Regionen.
+comment:    Native LiaScript-Kacheln mit Touch-Drag-and-Drop, gruppierten Kachelfolgen und automatischer Inhaltsprüfung in .Kachel-Regionen.
 repository: https://github.com/MINT-the-GAP/lia-kachel
 
 script: ./dist/index.js
@@ -11,6 +11,12 @@ script: ./dist/index.js
 @Kachelfolge: @Kachelfolge_(@uid,`@0`)
 
 @KachelfolgeN: @KachelfolgeN_(@uid,`@0`)
+
+@KachelgruppeN: @KachelgruppeN_(@uid,@0,`@1`)
+
+@KachelgruppenCheck: <script>window.LiaKachel.kachelgruppen.check('@0')</script>
+
+@KachelgruppeN_: <span id='lia-kachelgruppe-@0' data-lia-kachelgruppe='@1' data-lia-kachelfolge-mode='progressive'>@2<span data-lia-kachelfolge-dummy='true' aria-hidden='true' inert>✛</span></span>
 
 @Kachelfolge_
 <div id="lia-kachelfolge-@0" data-lia-kachelfolge="@0">
@@ -50,10 +56,12 @@ Das Template hat drei klar getrennte Schichten:
 Die Oberfläche bleibt vollständig nativ: Das Projekt erzeugt keine eigenen
 Targets, Sources, Prüfbuttons oder Rückmeldungen. Die Touch-Schicht übersetzt
 Gesten in LiaScripts Ereignisfolge. `@Kachelfolge` und `@KachelfolgeN`
-ergänzen die native Auswertung. Ein `<div class="Kachel">` schaltet für die
-darin enthaltenen nativen Multi-Drop-Quizze automatisch die zielweise
-Inhaltsprüfung ein. Versuche, Scoring, Persistenz, Auflösen und Feedback
-bleiben immer bei LiaScript.
+ergänzen die native Auswertung. `@KachelgruppeN` und genau ein
+`@KachelgruppenCheck` verbinden mehrere Tabellenzeilen mit einem gemeinsamen
+nativen Quiz. Ein `<div class="Kachel">` schaltet für die darin enthaltenen
+nativen Multi-Drop-Quizze automatisch die zielweise Inhaltsprüfung ein.
+Versuche, Scoring, Persistenz, Auflösen und Feedback bleiben immer bei
+LiaScript.
 
 ## Funktionsumfang
 
@@ -69,6 +77,8 @@ bleiben immer bei LiaScript.
   Makroaufrufen
 - `@KachelfolgeN` mit anfangs genau einem sichtbaren Target und schrittweiser
   Freigabe weiterer nativer Targets
+- gruppierte progressive Kachelfolgen in Markdown-Tabellen mit globalen
+  nativen Quelladressen und genau einem gemeinsamen Validator
 - `<div class="Kachel">` für zielweise Inhaltsprüfung mit austauschbaren,
   gleich beschrifteten Sources – ohne zusätzliches Makro oder Skript im Kurs
 - reihenfolgeunabhängige Prüfung anhand nativer Kachel-Identitäten statt Text
@@ -78,7 +88,7 @@ bleiben immer bei LiaScript.
 Für reproduzierbare Kurse empfiehlt sich der feste Versionsimport:
 
 ```markdown
-import: https://raw.githubusercontent.com/MINT-the-GAP/lia-kachel/0.6.0/README.md
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-kachel/0.7.0/README.md
 ```
 
 Wer bewusst immer den neuesten Stand verwenden möchte, importiert `main`:
@@ -114,6 +124,13 @@ durch runde Klammern als richtig markiert; die richtige Option darf vorne,
 mittig oder hinten stehen. Daneben können beliebig viele falsche Kacheln
 stehen. Bei einer Einheit ohne Alternativen ist die einzige Kachel wie in
 LiaScript automatisch richtig.
+
+Runde Klammern müssen innerhalb jeder Option ausgeglichen sein. Ein literales
+Pipe-Zeichen wird als `\|` geschrieben; gültig verschachtelte Inhalte wie
+`((x))` bleiben erlaubt. Eine unausgeglichene Spezifikation wird ohne
+Autokorrektur als `KachelfolgeSpecError` mit Target, Option und 1-basiger
+Zeichenposition abgelehnt; derselbe Autorenfehler wird höchstens einmal
+geloggt.
 
 Die richtigen Kacheln dürfen in **beliebiger Reihenfolge** in den Targets
 liegen. Für vier richtige Kacheln sind also beispielsweise `1-2-3-4`,
@@ -164,7 +181,58 @@ Ein Makroaufruf gehört jeweils auf eine eigene Zeile. Er darf erklärenden Text
 aber kein zusätzliches natives `[->[...]]` außerhalb seines Parameters im
 selben Absatz enthalten. Mehrere `@Kachelfolge`- und
 `@KachelfolgeN`-Zeilen dürfen direkt aufeinanderfolgen; jede wird automatisch
-zu einem eigenen Quizabsatz.
+zu einem eigenen Quizabsatz. Diese beiden Makros sind Blockmakros und deshalb
+nicht für Tabellenzellen vorgesehen. Verwende dort die folgende Gruppen-API.
+
+## Gruppierte Kachelfolgen in einem Tabellenquiz
+
+Eine Markdown-Tabelle mit Eingaben ist genau **ein** natives LiaScript-Quiz.
+Für logisch getrennte, progressive Gruppen verwendet jede Tabellenzelle das
+einzeilige `@KachelgruppeN`. Unmittelbar nach der letzten Tabellenzeile folgt
+auf der direkt nächsten Quellzeile genau ein `@KachelgruppenCheck`. Zwischen
+Tabelle und Check-Makro darf keine Leerzeile stehen:
+
+~~~ markdown
+| Wortart | Zuordnungen |
+| :-----: | :---------: |
+| Substantiv/Nomen | @KachelgruppeN(wortarten,`[->[(Haus)]][->[(Kopf)]][->[(Schlange)]][->[(Schule)]][->[(Buch)]][->[(Zug)]]`) |
+| Verb | @KachelgruppeN(wortarten,`[->[(lief)]][->[(gesprochen)]][->[(spielt)]][->[(versuchen)]]`) |
+| Adjektiv | @KachelgruppeN(wortarten,`[->[(kälter)]][->[(schlecht)]][->[(am besten)]][->[(kurz)]][->[(größer)]][->[(leise)]][->[(älter)]]`) |
+| Artikel | @KachelgruppeN(wortarten,`[->[(einer)]][->[(die)]][->[(das)]]`) |
+@KachelgruppenCheck(wortarten)
+~~~
+
+`wortarten` ist der explizite Schlüssel dieses einen Gruppenquiz. Er muss mit
+einem Buchstaben beginnen, darf danach nur Buchstaben, Ziffern, `_` und `-`
+enthalten und muss innerhalb der gerenderten Folie eindeutig sein. Derselbe
+Schlüssel steht in allen Zellmakros und im abschließenden Check-Makro.
+
+Der Gruppenvalidator liest die globalen nativen Target-IDs und
+Quelladressen `[Ursprungs-Target, Optionsindex]`. Er ordnet deshalb jede lokal
+formulierte Gruppe korrekt auf den gemeinsamen Tabellen-Track ab. Innerhalb
+einer Gruppe ist jede Permutation der richtigen Quellen zulässig; eine Quelle
+aus einer anderen Gruppe bleibt falsch. Sichtbare Beschriftungen werden nicht
+verglichen, sodass doppelte Texte möglich sind.
+
+Jede Gruppe steuert nur ihre eigenen Targets: Anfangs ist genau eines sichtbar,
+nach jeder Belegung wird in derselben Gruppe das nächste freigeschaltet. Erst
+bei vollständiger Belegung erscheint ihr inertes, nicht fokussierbares und mit
+`aria-hidden` aus dem Accessibility-Baum entferntes N+1-Feld.
+
+Die Gruppen müssen zusammen alle Multi-Drop-Targets des Tabellenquiz abdecken.
+Weitere native Eingaben oder ungruppierte Multi-Drop-Targets dürfen nicht im
+selben Tabellenquiz stehen. Mehrere gruppierte Tabellen auf derselben Folie
+benötigen verschiedene Schlüssel und jeweils genau ein eigenes
+`@KachelgruppenCheck`. Die Zellmakros enthalten kein Script; nur das eine
+Check-Makro ist der LiaScript-Validator. Check, Auflösen, Versuche, Feedback,
+Scoring und Persistenz bleiben dadurch ein gemeinsamer nativer Zustand.
+Für die native IndexedDB-Speicherung über einen vollständigen Seiten-Reload
+hinweg benötigt der Kurs wie im vollständigen Beispiel eine Major-Version ab
+`1.0.0`. `persistent: true` bewahrt zusätzlich den Folien-DOM beim Wechsel auf
+eine andere Folie. Beide Mechanismen stammen von LiaScript, nicht vom Template.
+
+Ein vollständiger direkt nutzbarer Kurs liegt unter
+[`examples/wortarten-tabelle.md`](examples/wortarten-tabelle.md).
 
 ## Inhaltsbasierte Kachelregion
 
@@ -224,6 +292,7 @@ Bild-`alt` oder `aria-label` als Inhalt.
 | `<div class="Kachel">` | Inhalt muss am jeweiligen Target stimmen; gleichlautende Sources sind austauschbar. |
 | `@Kachelfolge` | Die Menge nativer Quellidentitäten muss stimmen; die Targetreihenfolge ist egal. |
 | `@KachelfolgeN` | Wie `@Kachelfolge`, zusätzlich mit schrittweise sichtbaren Targets. |
+| `@KachelgruppeN` + `@KachelgruppenCheck` | Gruppenweise Quellidentitäten in genau einem nativen Tabellenquiz; jede Gruppe schreitet unabhängig fort. |
 
 Eine Region darf beliebig viele native Multi-Drop-Quizabsätze enthalten. Jeder
 Quizabsatz bleibt über seinen LiaScript-Track von allen anderen Quizzen
@@ -245,18 +314,29 @@ Browserkonsole erhält genau einen Diagnosehinweis.
 
 ~~~ text
 npm ci
+npx playwright install chromium firefox
 npm run verify
 ~~~
 
 npm run verify prüft die TypeScript-Typen, baut dist/index.js und testet Parser,
 Identitätsvergleich, zielweise Inhaltsprüfung, progressive Freigabe sowie die
-statischen Auslieferungs- und Importverträge. Das Bundle in dist/ wird mit
-versioniert; es wird nie von Hand bearbeitet.
+Auslieferungs- und Importverträge. Zusätzlich kompiliert der fest gepinnte
+lokale LiaScript-DevServer die vollständigen Fixtures und führt die
+Browserregressionen in aktuellem Chromium und Firefox aus. Das Bundle in dist/
+wird mit versioniert; es wird nie von Hand bearbeitet.
+
+Der lokale Preview des hier gepinnten Devservers legt selbst bei einer
+Kurs-Major-Version keinen Kurszustands-Store in IndexedDB an. Der Reload-Test
+prüft deshalb den nativen Neustart und insbesondere, dass keine Wrapper,
+Listener, Observer oder N+1-Felder dupliziert werden. Die dauerhafte
+Zustandsspeicherung in einem sie unterstützenden LiaScript-Host wird nicht durch
+dieses Template ersetzt.
 
 ~~~ text
 src/
   dom.ts       LiaScript-Selektoren, Quizgrenzen und native DragEvents
   content.ts   zielweise Prüfung gerenderter Kachelinhalte
+  groups.ts    gruppenweise Tabellenprüfung über native globale Adressen
   kachelfolge.ts Parser und nativer, reihenfolgeunabhängiger Validator
   progressive.ts schrittweise Anzeige nativer Targets
   styles.ts    einmalige Installation der eingebetteten styles.css
@@ -266,12 +346,16 @@ styles.css     gemeinsame, beim Build eingebettete CSS-Quelle
 dist/
   index.js     generierte JavaScript-Ausgabe
 tests/
-  *.test.mjs  Parser-, Inhalts-, Auslieferungs- und Importverträge
+  *.test.mjs  Parser-, Gruppen-, Inhalts- und Auslieferungsverträge
+  browser/    echte LiaScript-Regressionen in Chromium und Firefox
   fixtures/
     kachelfolge-import.md
     kachelfolge-n-import.md
+    kachelfolge-table-import.md
     kachel-region-import.md
     touch-import.md
+examples/
+  wortarten-tabelle.md
 ~~~
 
 ## CSS-Variablen
@@ -292,8 +376,16 @@ Das Design kann von einem Kurs über folgende Variablen angepasst werden:
 `@Kachelfolge` verändert ausschließlich die Regel, nach der die vorhandenen
 nativen Sources als Gesamtmenge geprüft werden. `@KachelfolgeN` blendet
 zusätzlich die noch nicht erreichten nativen Targets aus und zeigt nach ihrer
-vollständigen Belegung ein inertes N+1-Feld. `div.Kachel` vergleicht dagegen
-ausschließlich den sichtbaren Soll- und Istinhalt am jeweiligen Target. Die
-Region wertet weder Aufgabenprosa noch rohe Markdown-Quellen heuristisch aus.
-Es gibt keine zweite Drag-and-Drop-Implementierung, keine DOM-Klone nativer
-Targets und kein manuell nachgebautes Quiz-Feedback.
+vollständigen Belegung ein inertes N+1-Feld. Die Gruppen-API verwendet dieselbe
+Progression, prüft aber jede explizit markierte Gruppe gegen die globalen
+Adressen genau eines nativen Tabellen-Tracks. `div.Kachel` vergleicht dagegen
+ausschließlich den sichtbaren Soll- und Istinhalt am jeweiligen Target.
+
+Die Gruppenprüfung ist an LiaScripts native Multi-Drop-Handler, globale
+Target-IDs und die kompilierte Quizlösung gebunden und wird gegen die mit dem
+DevServer gepinnte LiaScript-Version browsergetestet. Kann dieser Vertrag nach
+einem LiaScript-Update nicht eindeutig hergestellt werden, wird die Belegung
+nicht als richtig akzeptiert und derselbe Diagnosefehler höchstens einmal
+geloggt. Es gibt keine zweite Drag-and-Drop-Implementierung, keine DOM-Klone
+nativer Targets, keine eigenen Check-/Resolve-Schaltflächen und kein manuell
+nachgebautes Quiz-Feedback.

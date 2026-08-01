@@ -27,6 +27,7 @@ async function authoredTemplateFiles() {
 
   return [
     'README.md',
+    'examples/wortarten-tabelle.md',
     'styles.css',
     'dist/index.js',
     ...sourceEntries
@@ -98,11 +99,24 @@ test('the LiaScript template references relative assets and documents the litera
   const bundle = await readFile(fromProject('dist/index.js'), 'utf8')
 
   assert.match(readme, /^script:\s*\.\/dist\/index\.js\s*$/m)
+  assert.match(readme, /^version:\s*1\.0\.0\s*$/m)
   assert.doesNotMatch(readme, /^link:/m)
   assert.match(readme, /^@Kachelfolge:\s*@Kachelfolge_\(@uid,`@0`\)\s*$/m)
   assert.match(
     readme,
     /^@KachelfolgeN:\s*@KachelfolgeN_\(@uid,`@0`\)\s*$/m,
+  )
+  assert.match(
+    readme,
+    /^@KachelgruppeN:\s*@KachelgruppeN_\(@uid,@0,`@1`\)\s*$/m,
+  )
+  assert.match(
+    readme,
+    /^@KachelgruppenCheck:\s*<script>window\.LiaKachel\.kachelgruppen\.check\('@0'\)<\/script>\s*$/m,
+  )
+  assert.match(
+    readme,
+    /^@KachelgruppeN_:\s*<span[^\r\n]+data-lia-kachelgruppe='@1'[^\r\n]+@2[^\r\n]+<\/span>\s*$/m,
   )
   assert.match(
     readme,
@@ -180,6 +194,12 @@ test('the package target has one stable browser bundle', async () => {
   const gitignore = await readFile(fromProject('.gitignore'), 'utf8')
 
   assert.equal(packageJson.app, 'dist/index.js')
+  assert.equal(packageJson.version, '0.7.0')
+  assert.equal(
+    packageJson.devDependencies['@liascript/devserver'],
+    '1.2.10--1.1.0',
+  )
+  assert.equal(packageJson.devDependencies.playwright, '1.62.1')
   assert.equal(packageJson.targets.app.context, 'browser')
   assert.equal(packageJson.targets.app.outputFormat, 'global')
   assert.equal(packageJson.targets.app.sourceMap, false)
@@ -236,6 +256,69 @@ test('the progressive fixture imports arbitrary and adjacent @KachelfolgeN macro
   assert.match(
     fixture,
     /@KachelfolgeN\(`\[->\[\(Karmesin\)\]\]\[->\[\(Scharlach\)\]\]\[->\[\(Rubinrot\)\|Kobalt\]\]`\)/,
+  )
+})
+
+test('the grouped-table fixture uses four inline groups and one adjacent validator', async () => {
+  const fixtureUrl = fromProject(
+    'tests/fixtures/kachelfolge-table-import.md',
+  )
+  const fixture = await readFile(fixtureUrl, 'utf8')
+  const importPath = fixture.match(/^import:\s*(\S+)\s*$/m)?.[1]
+  const normalized = fixture.replace(/\r\n/g, '\n')
+  const invocations = [
+    ...fixture.matchAll(
+      /@KachelgruppeN\(wortarten,`([^`]*)`\)/g,
+    ),
+  ]
+  const targetCounts = invocations.map(
+    ([, spec]) => spec.match(/\[->\[/g)?.length ?? 0,
+  )
+
+  assert.ok(importPath)
+  assert.equal(new URL(importPath, fixtureUrl).href, fromProject('README.md').href)
+  assert.deepEqual(targetCounts, [6, 4, 7, 3])
+  assert.equal(
+    normalized.match(/^@KachelgruppenCheck\(wortarten\)$/gm)?.length,
+    1,
+  )
+  assert.match(fixture, /^version:\s*1\.0\.0\s*$/m)
+  assert.match(fixture, /^persistent:\s*true\s*$/m)
+  assert.match(
+    normalized.trimEnd(),
+    /\| Artikel \| @KachelgruppeN\([^\n]+\n@KachelgruppenCheck\(wortarten\)/,
+    'the single-line validator must immediately follow the table',
+  )
+  assert.doesNotMatch(fixture, /@KachelfolgeN\(/)
+  assert.doesNotMatch(
+    fixture
+      .split(/\r?\n/)
+      .filter((line) => line.includes('@KachelgruppeN('))
+      .join('\n'),
+    /<script/i,
+  )
+})
+
+test('the complete grouped-table example is pinned and copyable', async () => {
+  const example = await readFile(
+    fromProject('examples/wortarten-tabelle.md'),
+    'utf8',
+  )
+  const normalized = example.replace(/\r\n/g, '\n')
+
+  assert.match(
+    example,
+    /^import:\s+https:\/\/raw\.githubusercontent\.com\/MINT-the-GAP\/lia-kachel\/0\.7\.0\/README\.md$/m,
+  )
+  assert.equal(
+    example.match(/@KachelgruppeN\(wortarten,/g)?.length,
+    4,
+  )
+  assert.match(example, /^version:\s*1\.0\.0\s*$/m)
+  assert.match(example, /^persistent:\s*true\s*$/m)
+  assert.match(
+    normalized.trimEnd(),
+    /\| Artikel \| @KachelgruppeN\([^\n]+\n@KachelgruppenCheck\(wortarten\)$/,
   )
 })
 
@@ -319,6 +402,10 @@ test('the generated bundle is classic JavaScript, exposes content helpers and in
   )
   assert.equal(
     typeof windowStub.LiaKachel.content.planAssignments,
+    'function',
+  )
+  assert.equal(
+    typeof windowStub.LiaKachel.kachelgruppen.check,
     'function',
   )
   assert.equal(windowStub.LiaKachel['kachel' + 'n'], undefined)

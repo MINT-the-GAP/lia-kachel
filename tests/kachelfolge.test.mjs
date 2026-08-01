@@ -11,7 +11,7 @@ const progressiveRootSelector =
 const progressiveDummySelector =
   "[data-lia-kachelfolge-dummy='true']"
 
-async function loadKachelfolgeApi() {
+async function loadKachelfolgeApi(runtimeConsole = console) {
   const bundle = await readFile(new URL('dist/index.js', projectRoot), 'utf8')
   const windowStub = {
     PointerEvent: function PointerEvent() {},
@@ -27,7 +27,7 @@ async function loadKachelfolgeApi() {
   windowStub.document = documentStub
 
   new vm.Script(bundle, { filename: 'dist/index.js' }).runInNewContext({
-    console,
+    console: runtimeConsole,
     document: documentStub,
     window: windowStub,
   })
@@ -157,6 +157,72 @@ test('the parser mirrors native option identities without reading labels', async
   assert.throws(() => api.parse('[->[(A)|(B)]]'))
   assert.throws(() => api.parse('[->[()]]'))
   assert.throws(() => api.parse('[->[(A)]'))
+})
+
+test('the parser validates balanced option parentheses without autocorrection', async () => {
+  const api = await loadKachelfolgeApi()
+
+  assert.deepEqual(plain(api.parse('[->[(größer)]]')), [[0, 0]])
+  assert.deepEqual(
+    plain(
+      api.parse(
+        String.raw`[->[((x))|falsch]][->[falsch|(A\|eins)]][->[(A\)B)|falsch]][->[C]]`,
+      ),
+    ),
+    [
+      [0, 0],
+      [1, 1],
+      [2, 0],
+      [3, 0],
+    ],
+  )
+
+  assert.throws(
+    () => api.parse('[->[(gr\u00f6\u00dfer))]]'),
+    (error) => {
+      assert.equal(error?.name, 'KachelfolgeSpecError')
+      assert.match(error.message, /Target 1/)
+      assert.match(error.message, /Option 1/)
+      assert.match(error.message, /Zeichen 13/)
+      return true
+    },
+  )
+
+  assert.throws(
+    () => api.parse('[->[(A)|falsch)]]'),
+    /Target 1, Option 2:.*Zeichen 15/,
+  )
+  assert.throws(
+    () => api.parse('[->[(A)(B)|falsch]]'),
+    /Target 1, Option 1:.*Optionsende.*Zeichen 7/,
+  )
+})
+
+test('identical authoring errors log once across uids while contract warnings stay scoped', async () => {
+  const errors = []
+  const runtimeConsole = Object.create(console)
+  runtimeConsole.error = (...parts) => errors.push(parts.join(' '))
+  const api = await loadKachelfolgeApi(runtimeConsole)
+  const malformed = '[->[(gr\u00f6\u00dfer))]]'
+
+  assert.throws(
+    () => api.check('author-a', malformed),
+    { name: 'KachelfolgeSpecError' },
+  )
+  assert.throws(
+    () => api.check('author-b', malformed),
+    { name: 'KachelfolgeSpecError' },
+  )
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /@Kachelfolge author-a/)
+
+  const missingRoot = { getElementById: () => null }
+  assert.equal(api.check('contract-a', '[->[A]]', missingRoot), false)
+  assert.equal(api.check('contract-a', '[->[A]]', missingRoot), false)
+  assert.equal(api.check('contract-b', '[->[A]]', missingRoot), false)
+  assert.equal(errors.length, 3)
+  assert.match(errors[1], /@Kachelfolge contract-a/)
+  assert.match(errors[2], /@Kachelfolge contract-b/)
 })
 
 test('source addresses are compared as an exact order-independent multiset', async () => {

@@ -18,24 +18,131 @@ const UNIT_START = '[->['
 const SOURCE_ADDRESS_PATTERN =
   /["']?value["']?\s*:\s*\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/
 const warnedMessages = new Set<string>()
+const warnedAuthoringMessages = new Set<string>()
+
+interface KachelOption {
+  raw: string
+  start: number
+}
 
 function fail(message: string): never {
   throw new KachelfolgeSpecError(message)
 }
 
-function splitAtUnescapedPipes(input: string): string[] {
-  const options: string[] = []
+function splitAtUnescapedPipes(
+  input: string,
+  contentStart: number,
+): KachelOption[] {
+  const options: KachelOption[] = []
   let start = 0
 
   for (let index = 0; index < input.length; index += 1) {
-    if (input[index] !== '|' || input[index - 1] === '\\') continue
+    if (input[index] === '\\' && index + 1 < input.length) {
+      index += 1
+      continue
+    }
 
-    options.push(input.slice(start, index).replace(/\\\|/g, '|'))
+    if (input[index] !== '|') continue
+
+    options.push({
+      raw: input.slice(start, index),
+      start: contentStart + start,
+    })
     start = index + 1
   }
 
-  options.push(input.slice(start).replace(/\\\|/g, '|'))
+  options.push({
+    raw: input.slice(start),
+    start: contentStart + start,
+  })
   return options
+}
+
+function failOption(
+  target: number,
+  option: number,
+  position: number,
+  message: string,
+): never {
+  return fail(
+    `Target ${String(target + 1)}, Option ${String(option + 1)}: ${message} ` +
+      `an Zeichen ${String(position + 1)} (1-basige Zeichenposition).`,
+  )
+}
+
+function analyzeOption(
+  option: KachelOption,
+  targetIndex: number,
+  optionIndex: number,
+): { isCorrect: boolean; content: string } {
+  const openings: number[] = []
+  const first = option.raw.search(/\S/)
+  let last = option.raw.length - 1
+  let outerClose = -1
+
+  while (last >= 0 && /\s/.test(option.raw[last])) last -= 1
+
+  for (let index = 0; index < option.raw.length; index += 1) {
+    const character = option.raw[index]
+
+    if (character === '\\' && index + 1 < option.raw.length) {
+      index += 1
+      continue
+    }
+
+    if (character === '(') {
+      openings.push(index)
+      continue
+    }
+
+    if (character !== ')') continue
+
+    const opening = openings.pop()
+    if (opening === undefined) {
+      return failOption(
+        targetIndex,
+        optionIndex,
+        option.start + index,
+        'unerwartete schlie\u00dfende runde Klammer',
+      )
+    }
+
+    if (opening === first && openings.length === 0) outerClose = index
+  }
+
+  if (openings.length) {
+    const opening = openings[openings.length - 1]
+    return failOption(
+      targetIndex,
+      optionIndex,
+      option.start + opening,
+      'nicht geschlossene runde Klammer',
+    )
+  }
+
+  const startsWithOuterOpening = first >= 0 && option.raw[first] === '('
+  if (
+    startsWithOuterOpening &&
+    outerClose >= 0 &&
+    outerClose !== last
+  ) {
+    return failOption(
+      targetIndex,
+      optionIndex,
+      option.start + outerClose,
+      'die \u00e4u\u00dfere Klammer der richtigen Option schlie\u00dft vor dem Optionsende',
+    )
+  }
+
+  const isCorrect = startsWithOuterOpening && outerClose === last
+  const rawContent = isCorrect
+    ? option.raw.slice(first + 1, last).trim()
+    : option.raw.trim()
+
+  return {
+    isCorrect,
+    content: rawContent.replace(/\\\|/g, '|'),
+  }
 }
 
 function readUnit(
@@ -88,15 +195,20 @@ export function parseKachelTargets(rawSpec: string): KachelTargetSpec[] {
       return fail(`Kachel ${String(targets.length + 1)} ist leer.`)
     }
 
-    const options = splitAtUnescapedPipes(unit.content)
+    const options = splitAtUnescapedPipes(
+      unit.content,
+      cursor + UNIT_START.length,
+    )
+    const analyzedOptions = options.map((option, optionIndex) =>
+      analyzeOption(option, targets.length, optionIndex),
+    )
     const correctOptions: number[] = []
 
     if (options.length === 1) {
       correctOptions.push(0)
     } else {
-      options.forEach((option, optionIndex) => {
-        const trimmed = option.trim()
-        if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+      analyzedOptions.forEach((option, optionIndex) => {
+        if (option.isCorrect) {
           correctOptions.push(optionIndex)
         }
       })
@@ -109,11 +221,7 @@ export function parseKachelTargets(rawSpec: string): KachelTargetSpec[] {
       )
     }
 
-    const correctOption = options[correctOptions[0]].trim()
-    const correctContent =
-      correctOption.startsWith('(') && correctOption.endsWith(')')
-        ? correctOption.slice(1, -1).trim()
-        : correctOption
+    const correctContent = analyzedOptions[correctOptions[0]].content
 
     if (!correctContent) {
       return fail(
@@ -210,8 +318,8 @@ function reportAuthoringProblem(uid: string, error: unknown): never {
   const message = error instanceof Error ? error.message : String(error)
   const warning = `[lia-Kachel @Kachelfolge ${uid}] ${message}`
 
-  if (!warnedMessages.has(warning)) {
-    warnedMessages.add(warning)
+  if (!warnedAuthoringMessages.has(message)) {
+    warnedAuthoringMessages.add(message)
     console.error(warning)
   }
 

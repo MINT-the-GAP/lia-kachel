@@ -6,6 +6,7 @@ import {
   renderedTileContent,
   sameTargetContents,
 } from './content'
+import { checkKachelgruppen } from './groups'
 import {
   checkKachelfolge,
   parseKachelfolgeSpec,
@@ -42,6 +43,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     existingApi.kachelfolge && typeof existingApi.kachelfolge === 'object'
       ? (existingApi.kachelfolge as Record<string, unknown>)
       : {}
+  const existingKachelgruppen =
+    existingApi.kachelgruppen &&
+    typeof existingApi.kachelgruppen === 'object'
+      ? (existingApi.kachelgruppen as Record<string, unknown>)
+      : {}
   const existingContent =
     existingApi.content && typeof existingApi.content === 'object'
       ? (existingApi.content as Record<string, unknown>)
@@ -63,6 +69,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     refreshProgressive: refreshProgressiveKachelfolgen,
     sameAddressMultiset: sameSourceAddressMultiset,
     sourceAddressFromHandler,
+  }
+  existingApi.kachelgruppen = {
+    ...existingKachelgruppen,
+    check: checkKachelgruppen,
   }
   runtime.LiaKachel = existingApi
 
