@@ -48,13 +48,13 @@ Das Template hat drei klar getrennte Schichten:
   Ziel-, belegten und aufgelösten LiaScript-Kacheln. Beim Build wird sie in
   dist/index.js eingebettet, damit ein Import kein externes CSS mit falschem
   MIME-Typ laden muss.
-- src/ enthält die wartbare TypeScript-Quelle für Touch, Stift,
+- src/ enthält die wartbare TypeScript-Quelle für Maus, Touch, Stift,
   reihenfolgeunabhängige Auswertung, progressive Zielanzeige und die
   automatische Inhaltsprüfung in `.Kachel`-Regionen.
 - dist/index.js ist das daraus gebaute, direkt importierbare Browser-Skript.
 
 Die Oberfläche bleibt vollständig nativ: Das Projekt erzeugt keine eigenen
-Targets, Sources, Prüfbuttons oder Rückmeldungen. Die Touch-Schicht übersetzt
+Targets, Sources, Prüfbuttons oder Rückmeldungen. Die Drag-Schicht übersetzt
 Gesten in LiaScripts Ereignisfolge. `@Kachelfolge` und `@KachelfolgeN`
 ergänzen die native Auswertung. `@KachelgruppeN` und genau ein
 `@KachelgruppenCheck` verbinden mehrere Tabellenzeilen mit einem gemeinsamen
@@ -65,7 +65,7 @@ LiaScript.
 
 ## Funktionsumfang
 
-- Drag-and-Drop mit Touch und Stift über Pointer Events
+- Drag-and-Drop mit Maus, Touch und Stift über Pointer Events
 - Fallback über Touch Events für Browser ohne Pointer Events
 - Bewegungsschwelle von 8 px, damit ein Antippen ein Antippen bleibt
 - eigener, nicht interaktiver Drag-Ghost

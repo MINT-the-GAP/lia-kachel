@@ -24,6 +24,7 @@ type InputMode = 'pointer' | 'touch'
 interface Gesture {
   inputMode: InputMode
   inputId: number
+  mousePointer: boolean
   source: HTMLElement
   sourceKind: TileSourceKind
   trackKey: string
@@ -114,6 +115,8 @@ class TouchDragController {
       this.listen(this.document, 'pointermove', this.onPointerMove, true)
       this.listen(this.document, 'pointerup', this.onPointerUp, true)
       this.listen(this.document, 'pointercancel', this.onPointerCancel, true)
+      this.listen(this.document, 'dragstart', this.onNativeDragStart, true)
+      this.listen(this.document, 'dragend', this.onNativeDragEnd, true)
     } else {
       this.listen(this.document, 'touchstart', this.onTouchStart, {
         capture: true,
@@ -165,11 +168,8 @@ class TouchDragController {
 
   private readonly onPointerDown = (event: Event): void => {
     const pointerEvent = event as PointerEvent
-    const isTouchPointer =
-      pointerEvent.pointerType === 'touch' || pointerEvent.pointerType === 'pen'
-
     if (!this.gesture) this.clearClickSuppression()
-    if (!isTouchPointer) return
+    if (!['mouse', 'touch', 'pen'].includes(pointerEvent.pointerType)) return
 
     if (
       this.gesture &&
@@ -194,6 +194,7 @@ class TouchDragController {
     this.armGesture(
       'pointer',
       pointerEvent.pointerId,
+      pointerEvent.pointerType === 'mouse',
       source.element,
       source.kind,
       source.trackKey,
@@ -260,6 +261,25 @@ class TouchDragController {
     }
   }
 
+  private readonly onNativeDragStart = (event: Event): void => {
+    const gesture = this.gesture
+    if (!gesture?.mousePointer || !event.isTrusted) return
+    if (!gesture.source.contains(event.target as Node)) return
+
+    // Native mouse DnD can stop PointerEvents and race our LiaScript messages.
+    // Keep one event sequence, including when Edge starts its drag first.
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+
+  private readonly onNativeDragEnd = (event: Event): void => {
+    const gesture = this.gesture
+    if (!gesture?.mousePointer || !event.isTrusted) return
+    if (!gesture.source.contains(event.target as Node)) return
+
+    event.stopImmediatePropagation()
+  }
+
   private readonly onTouchStart = (event: Event): void => {
     const touchEvent = event as TouchEvent
 
@@ -280,6 +300,7 @@ class TouchDragController {
     this.armGesture(
       'touch',
       touch.identifier,
+      false,
       source.element,
       source.kind,
       source.trackKey,
@@ -378,6 +399,7 @@ class TouchDragController {
   private armGesture(
     inputMode: InputMode,
     inputId: number,
+    mousePointer: boolean,
     source: HTMLElement,
     sourceKind: TileSourceKind,
     trackKey: string,
@@ -386,6 +408,7 @@ class TouchDragController {
     this.gesture = {
       inputMode,
       inputId,
+      mousePointer,
       source,
       sourceKind,
       trackKey,

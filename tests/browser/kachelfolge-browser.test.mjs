@@ -4,7 +4,7 @@ import { once } from 'node:events'
 import { createServer } from 'node:net'
 import test, { after, before } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { chromium, firefox } from 'playwright'
+import { chromium, firefox, webkit } from 'playwright'
 
 const HOST = '127.0.0.1'
 const START_TIMEOUT = 30_000
@@ -44,12 +44,18 @@ after(async () => server?.stop())
 for (const [browserName, browserType] of [
   ['chromium', chromium],
   ['firefox', firefox],
+  ['webkit', webkit],
 ]) {
   test(
     `${browserName}: native LiaScript integration`,
     { timeout: TEST_TIMEOUT },
     async (t) => {
-      const browser = await browserType.launch({ headless: true })
+      const browser = await browserType.launch({
+        headless: true,
+        ...(browserName === 'chromium' && process.env.KACHEL_BROWSER_CHANNEL
+          ? { channel: process.env.KACHEL_BROWSER_CHANNEL }
+          : {}),
+      })
       t.after(async () => browser.close())
 
       await t.test('grouped table, progression, check, reload and revisit', async () => {
@@ -142,6 +148,34 @@ for (const [browserName, browserType] of [
         assert.equal(await crossed.page.locator(CHECK).count(), 1)
         assert.equal(await crossed.page.locator(RESOLVE).count(), 1)
         assertNoRuntimeErrors(crossed)
+      })
+
+      await t.test('math tiles from Lia9_01 can be dragged', async () => {
+        const session = await createSession(browser)
+        t.after(async () => session.context.close())
+        await openCourse(session.page, 'tests/fixtures/lia9_01-math-drag.md', 2, TARGET, 8)
+
+        await session.page.evaluate(() => {
+          window.__mathTileDragStarts = []
+          document.addEventListener('dragstart', (event) => {
+            window.__mathTileDragStarts.push(event.isTrusted)
+          }, true)
+        })
+        const source = session.page.locator(SOURCE).first()
+        const target = session.page.locator(TARGET).first()
+        await source.dragTo(target)
+        await target.locator(PLACED_SOURCE).waitFor({ timeout: 15_000 })
+        assert.deepEqual(
+          await session.page.evaluate(() => window.__mathTileDragStarts),
+          [false],
+          'mouse drag must use one synthetic LiaScript event sequence',
+        )
+
+        await target.locator(PLACED_SOURCE).dragTo(session.page.locator(TARGET).nth(1))
+        await session.page.locator(TARGET).nth(1).locator(PLACED_SOURCE).waitFor({ timeout: 15_000 })
+        assert.equal(await target.locator(PLACED_SOURCE).count(), 0)
+        assert.deepEqual(await session.page.evaluate(() => window.__mathTileDragStarts), [false])
+        assertNoRuntimeErrors(session)
       })
 
       await t.test('standalone and adjacent macros remain independent', async () => {

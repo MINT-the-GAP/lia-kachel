@@ -198,11 +198,12 @@ span[role='button'][aria-grabbed]:not([onclick*='dragsource']):not(
 }
 
 /*
- * Touch and pen drag adapter
+ * Pointer drag adapter
  *
  * Single-finger panning is disabled only when a gesture starts on an
  * interactive source. Pinch zoom and page scrolling remain available from all
- * other content; mouse drag and LiaScript's keyboard controls stay untouched.
+ * other content; mouse drag uses the same gesture adapter, while LiaScript's
+ * keyboard controls stay untouched.
  */
 :root span[role='button'][aria-grabbed][draggable='true'][ondragstart*='dragstart'][ondragend*='dragend'],
 :root span[role='button'][onclick*='dragtarget'][ondragover*='dragenter'] > [draggable='true'][ondragend*='dragend'] {
