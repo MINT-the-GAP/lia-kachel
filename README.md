@@ -4,7 +4,6 @@ version:    1.0.0
 language:   de
 narrator:   Deutsch Female
 comment:    Native LiaScript-Kacheln mit Touch-Drag-and-Drop, gruppierten Kachelfolgen und automatischer Inhaltsprüfung in .Kachel-Regionen.
-repository: https://github.com/MINT-the-GAP/lia-kachel
 
 script: ./dist/index.js
 
